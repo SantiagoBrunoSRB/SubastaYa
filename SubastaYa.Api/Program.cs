@@ -1,6 +1,11 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using SubastaYa.Api.Application.Interfaces;
+using SubastaYa.Api.Application.Services;
+using SubastaYa.Api.Infrastructure.BackgroundServices;
 using SubastaYa.Api.Infrastructure.Data;
+using SubastaYa.Api.Infrastructure.Repositories;
+using SubastaYa.Api.Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +19,14 @@ builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// 3. Configuracion de CORS
+// 3. Inyeccion de Dependencias - Modulo Billetera y Servicios
+builder.Services.AddScoped<IWalletRepository, WalletRepository>();
+builder.Services.AddScoped<IWalletService, WalletService>();
+
+// 4. Background Services (Workers en segundo plano)
+builder.Services.AddHostedService<AuctionClosingWorker>();
+
+// 5. Configuracion de CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendCors", policy =>
@@ -22,14 +34,14 @@ builder.Services.AddCors(options =>
         policy.WithOrigins("http://localhost:5500", "http://127.0.0.1:5500") // URL del frontend
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // Aqui se usa SignalR o Cookies
+              .AllowCredentials(); // Para SignalR y Cookies
     });
 });
 
-// 4. Agregar SignalR (WebSockets)
+// 6. Agregar SignalR (WebSockets)
 builder.Services.AddSignalR();
 
-// 5. Agregar Controladores
+// 7. Agregar Controladores
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -52,7 +64,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-// Mapear Hub de SignalR (cuando se cree en Presentation/Hubs)
-// app.MapHub<AuctionHub>("/auctionHub");
+
+// Mapeo del Hub de SignalR para WebSockets en tiempo real
+app.MapHub<AuctionHub>("/auctionHub");
 
 app.Run();

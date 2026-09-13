@@ -15,6 +15,7 @@ namespace SubastaYa.Api.Infrastructure.Data
         public DbSet<Wallet> Wallets { get; set; }
         public DbSet<Bid> Bids { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<TransactionLedger> TransactionLedgers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
