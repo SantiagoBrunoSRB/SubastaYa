@@ -6,6 +6,9 @@ using SubastaYa.Api.Domain.Exceptions;
 
 namespace SubastaYa.Api.Application.Services;
 
+/// <summary>
+/// Servicio de aplicación encargado de la gestión de billeteras, operaciones de saldo y retenciones de subastas (Escrow).
+/// </summary>
 public class WalletService : IWalletService
 {
     private readonly IWalletRepository _walletRepository;
@@ -15,6 +18,9 @@ public class WalletService : IWalletService
         _walletRepository = walletRepository;
     }
 
+    /// <summary>
+    /// Busca la billetera del usuario en base de datos. Si no existe, crea una nueva con saldo en cero.
+    /// </summary>
     private async Task<Wallet> GetOrCreateWalletAsync(string userId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -36,6 +42,9 @@ public class WalletService : IWalletService
         return wallet;
     }
 
+    /// <summary>
+    /// Obtiene el balance desglosado (Total, Retenido y Disponible) del usuario.
+    /// </summary>
     public async Task<WalletBalanceResponseDto> GetBalanceAsync(string userId, CancellationToken ct = default)
     {
         var wallet = await GetOrCreateWalletAsync(userId, ct);
@@ -47,6 +56,9 @@ public class WalletService : IWalletService
         );
     }
 
+    /// <summary>
+    /// Valida rápidamente si el usuario posee saldo disponible suficiente sin realizar bloqueos.
+    /// </summary>
     public async Task<bool> HasSufficientBalanceAsync(string userId, decimal amount, CancellationToken ct = default)
     {
         if (amount <= 0) return false;
@@ -55,6 +67,9 @@ public class WalletService : IWalletService
         return wallet.AvailableBalance >= amount;
     }
 
+    /// <summary>
+    /// Acredita dinero en la billetera y genera una entrada 'Deposit' en el historial de transacciones.
+    /// </summary>
     public async Task<WalletBalanceResponseDto> DepositAsync(string userId, decimal amount, CancellationToken ct = default)
     {
         if (amount <= 0)
@@ -83,6 +98,9 @@ public class WalletService : IWalletService
         );
     }
 
+    /// <summary>
+    /// Retiene fondos del saldo disponible del usuario para respaldar una puja activa.
+    /// </summary>
     public async Task HoldFundsAsync(string userId, decimal amount, int? auctionId = null, CancellationToken ct = default)
     {
         if (amount <= 0)
@@ -109,6 +127,9 @@ public class WalletService : IWalletService
         await _walletRepository.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Libera saldo retenido devolviéndolo al disponible del usuario (cuando su puja fue superada).
+    /// </summary>
     public async Task ReleaseFundsAsync(string userId, decimal amount, int? auctionId = null, CancellationToken ct = default)
     {
         if (amount <= 0)
@@ -136,6 +157,9 @@ public class WalletService : IWalletService
         await _walletRepository.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Transacción atómica que libera el saldo del postor anterior y retiene el saldo del nuevo postor.
+    /// </summary>
     public async Task ReplaceHoldAsync(
         string? previousBidderId,
         decimal? previousAmount,
@@ -203,6 +227,9 @@ public class WalletService : IWalletService
         }
     }
 
+    /// <summary>
+    /// Liquidación final de una subasta: debita el dinero del comprador y lo acredita en la billetera del vendedor.
+    /// </summary>
     public async Task SettleAuctionAsync(string buyerId, string sellerId, decimal amount, int auctionId, CancellationToken ct = default)
     {
         if (amount <= 0)
@@ -256,6 +283,9 @@ public class WalletService : IWalletService
         }
     }
 
+    /// <summary>
+    /// Obtiene el historial de movimientos contables de la billetera de un usuario.
+    /// </summary>
     public async Task<IEnumerable<TransactionResponseDto>> GetTransactionsAsync(string userId, CancellationToken ct = default)
     {
         var wallet = await _walletRepository.GetByUserIdAsync(userId, ct);
