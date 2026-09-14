@@ -1,6 +1,11 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SubastaYa.Api.Infrastructure.Data;
+using SubastaYa.Api.Application.Interfaces.Persistence;
+using SubastaYa.Api.Application.UseCases.Auctions.CreateAuction;
+using SubastaYa.Api.Application.UseCases.Auctions.GetAuctions;
+using SubastaYa.Api.Application.UseCases.Bids.PlaceBid;
+using SubastaYa.Api.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,7 +34,17 @@ builder.Services.AddCors(options =>
 // 4. Agregar SignalR (WebSockets)
 builder.Services.AddSignalR();
 
-// 5. Agregar Controladores
+// 5. Agregar Inyeccion de Dependencias (Domain/Application/Infrastructure)
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IAuctionRepository, AuctionRepository>();
+builder.Services.AddScoped<IBidRepository, BidRepository>();
+
+// Casos de Uso
+builder.Services.AddScoped<CreateAuctionUseCase>();
+builder.Services.AddScoped<GetAuctionsUseCase>();
+builder.Services.AddScoped<PlaceBidUseCase>();
+
+// 6. Agregar Controladores
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
