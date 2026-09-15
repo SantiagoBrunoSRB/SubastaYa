@@ -85,5 +85,20 @@ app.MapControllers();
 // Mapeo del Hub de SignalR para WebSockets en tiempo real
 app.MapHub<AuctionHub>("/auctionHub");
 
+// Seed Data
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        await DataSeeder.SeedAsync(services);
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Ocurrió un error al sembrar la base de datos.");
+    }
+}
+
 app.Run();
 
