@@ -1,4 +1,4 @@
-﻿namespace SubastaYa.Api.Domain.Exceptions;
+namespace SubastaYa.Api.Domain.Exceptions;
 
 public class DomainException : Exception
 {
@@ -14,3 +14,4 @@ public class DomainException : Exception
     {
     }
 }
+
