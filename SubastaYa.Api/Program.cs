@@ -10,6 +10,7 @@ using SubastaYa.Api.Infrastructure.BackgroundServices;
 using SubastaYa.Api.Infrastructure.Data;
 using SubastaYa.Api.Infrastructure.Repositories;
 using SubastaYa.Api.Presentation.Hubs;
+using SubastaYa.Api.Presentation.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,8 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configuracion del pipeline HTTP
+app.UseMiddleware<ExceptionMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
