@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SubastaYa.Api.Application.DTOs;
 using SubastaYa.Api.Application.Interfaces;
@@ -5,6 +6,7 @@ using SubastaYa.Api.Domain.Exceptions;
 
 namespace SubastaYa.Api.Presentation.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class WalletsController : ControllerBase

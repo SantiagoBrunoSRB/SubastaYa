@@ -11,7 +11,10 @@ using SubastaYa.Api.Infrastructure.Data;
 using SubastaYa.Api.Infrastructure.Repositories;
 using SubastaYa.Api.Presentation.Hubs;
 using SubastaYa.Api.Presentation.Middleware;
-
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using SubastaYa.Api.Application.Interfaces.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuracion de la Base de Datos MySQL
@@ -23,6 +26,35 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
+
+// 2.1 Configuracion de JWT
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var key = Encoding.ASCII.GetBytes(jwtSettings["Key"] ?? throw new InvalidOperationException("Jwt Key missing"));
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidateAudience = true,
+        ValidAudience = jwtSettings["Audience"],
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+// 2.2 Registrar AuthService
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 // 3. Inyeccion de Dependencias - Modulo Billetera y Servicios
 builder.Services.AddScoped<IWalletRepository, WalletRepository>();
