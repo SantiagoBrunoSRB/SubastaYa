@@ -11,6 +11,7 @@ using SubastaYa.Api.Infrastructure.Data;
 using SubastaYa.Api.Infrastructure.Data.Seeder;
 using SubastaYa.Api.Infrastructure.Repositories;
 using SubastaYa.Api.Presentation.Hubs;
+using SubastaYa.Api.Presentation.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +63,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Interceptor global de excepciones (ProblemDetails RFC 7807)
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // Configuracion del pipeline HTTP
 if (app.Environment.IsDevelopment())
