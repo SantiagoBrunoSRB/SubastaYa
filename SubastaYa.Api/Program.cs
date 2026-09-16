@@ -8,6 +8,7 @@ using SubastaYa.Api.Application.UseCases.Auctions.GetAuctions;
 using SubastaYa.Api.Application.UseCases.Bids.PlaceBid;
 using SubastaYa.Api.Infrastructure.BackgroundServices;
 using SubastaYa.Api.Infrastructure.Data;
+using SubastaYa.Api.Infrastructure.Data.Seeder;
 using SubastaYa.Api.Infrastructure.Repositories;
 using SubastaYa.Api.Presentation.Hubs;
 
@@ -77,10 +78,24 @@ app.UseCors("FrontendCors");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+// Ejecutar siembra de datos semilla en base de datos al iniciar la app
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDbContext>();
+        var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
+        await DbSeeder.SeedAsync(context, userManager);
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Ocurrió un error al ejecutar la siembra de datos semilla.");
+    }
+}
 
-// Mapeo del Hub de SignalR para WebSockets en tiempo real
+app.MapControllers();
 app.MapHub<AuctionHub>("/auctionHub");
 
 app.Run();
-
