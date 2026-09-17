@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SubastaYa.Api.Application.DTOs;
 using SubastaYa.Api.Application.Interfaces;
-using SubastaYa.Api.Domain.Exceptions;
 
 namespace SubastaYa.Api.Presentation.Controllers;
 
@@ -12,12 +11,10 @@ namespace SubastaYa.Api.Presentation.Controllers;
 public class WalletsController : ControllerBase
 {
     private readonly IWalletService _walletService;
-    private readonly ILogger<WalletsController> _logger;
 
-    public WalletsController(IWalletService walletService, ILogger<WalletsController> logger)
+    public WalletsController(IWalletService walletService)
     {
         _walletService = walletService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -37,6 +34,7 @@ public class WalletsController : ControllerBase
 
     /// <summary>
     /// Realiza un depósito de dinero en la billetera de un usuario.
+    /// Excepciones como InvalidAmountException son interceptadas por el GlobalExceptionMiddleware.
     /// </summary>
     [HttpPost("{userId}/deposit")]
     [ProducesResponseType(typeof(WalletBalanceResponseDto), StatusCodes.Status200OK)]
@@ -50,23 +48,8 @@ public class WalletsController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "El cuerpo de la solicitud no puede estar vacío." });
 
-        if (request.Amount <= 0)
-            return BadRequest(new { message = "El monto a depositar debe ser mayor a 0." });
-
-        try
-        {
-            var result = await _walletService.DepositAsync(userId, request.Amount, ct);
-            return Ok(result);
-        }
-        catch (InvalidAmountException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error al depositar fondos para el usuario {UserId}", userId);
-            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Ocurrió un error al procesar el depósito." });
-        }
+        var result = await _walletService.DepositAsync(userId, request.Amount, ct);
+        return Ok(result);
     }
 
     /// <summary>

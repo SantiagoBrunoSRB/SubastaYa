@@ -96,6 +96,9 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Interceptor global de excepciones (ProblemDetails RFC 7807)
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 // Configuracion del pipeline HTTP
 app.UseMiddleware<ExceptionMiddleware>();
 
