@@ -73,4 +73,15 @@ public class WalletsController : ControllerBase
         var transactions = await _walletService.GetTransactionsAsync(userId, ct);
         return Ok(transactions);
     }
+
+    /// <summary>
+    /// Re-siembra los datos semilla iniciales en la base de datos (Entorno de desarrollo/testing).
+    /// </summary>
+    [HttpPost("reseed")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Reseed([FromServices] IServiceProvider serviceProvider)
+    {
+        await SubastaYa.Api.Infrastructure.Data.DataSeeder.SeedAsync(serviceProvider);
+        return Ok(new { message = "Base de datos re-sembrada exitosamente." });
+    }
 }
