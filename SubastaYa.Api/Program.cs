@@ -5,6 +5,7 @@ using SubastaYa.Api.Application.Interfaces.Persistence;
 using SubastaYa.Api.Application.Services;
 using SubastaYa.Api.Application.UseCases.Auctions.CreateAuction;
 using SubastaYa.Api.Application.UseCases.Auctions.GetAuctions;
+using SubastaYa.Api.Application.UseCases.Auctions.GetAuctionById;
 using SubastaYa.Api.Application.UseCases.Bids.PlaceBid;
 using SubastaYa.Api.Infrastructure.BackgroundServices;
 using SubastaYa.Api.Infrastructure.Data;
@@ -65,10 +66,12 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IAuctionRepository, AuctionRepository>();
 builder.Services.AddScoped<IBidRepository, BidRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
 // Casos de Uso Subastas
 builder.Services.AddScoped<CreateAuctionUseCase>();
 builder.Services.AddScoped<GetAuctionsUseCase>();
+builder.Services.AddScoped<GetAuctionByIdUseCase>();
 builder.Services.AddScoped<PlaceBidUseCase>();
 
 // 5. Background Services (Workers en segundo plano)

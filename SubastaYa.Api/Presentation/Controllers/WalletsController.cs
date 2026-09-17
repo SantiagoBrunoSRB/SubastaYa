@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SubastaYa.Api.Application.DTOs;
 using SubastaYa.Api.Application.Interfaces;
+using System.Security.Claims;
 
 namespace SubastaYa.Api.Presentation.Controllers;
 
@@ -20,13 +21,15 @@ public class WalletsController : ControllerBase
     /// <summary>
     /// Consulta el saldo (total, retenido y disponible) de la billetera de un usuario.
     /// </summary>
-    [HttpGet("{userId}/balance")]
+    [HttpGet("balance")]
     [ProducesResponseType(typeof(WalletBalanceResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetBalance(string userId, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetBalance(CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
-            return BadRequest(new { message = "El userId es requerido." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
 
         var balance = await _walletService.GetBalanceAsync(userId, ct);
         return Ok(balance);
@@ -36,14 +39,16 @@ public class WalletsController : ControllerBase
     /// Realiza un depósito de dinero en la billetera de un usuario.
     /// Excepciones como InvalidAmountException son interceptadas por el GlobalExceptionMiddleware.
     /// </summary>
-    [HttpPost("{userId}/deposit")]
+    [HttpPost("deposit")]
     [ProducesResponseType(typeof(WalletBalanceResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Deposit(string userId, [FromBody] DepositRequestDto request, CancellationToken ct)
+    public async Task<IActionResult> Deposit([FromBody] DepositRequestDto request, CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
-            return BadRequest(new { message = "El userId es requerido." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
 
         if (request == null)
             return BadRequest(new { message = "El cuerpo de la solicitud no puede estar vacío." });
@@ -55,13 +60,15 @@ public class WalletsController : ControllerBase
     /// <summary>
     /// Obtiene el historial de transacciones de un usuario.
     /// </summary>
-    [HttpGet("{userId}/transactions")]
+    [HttpGet("transactions")]
     [ProducesResponseType(typeof(IEnumerable<TransactionResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetTransactions(string userId, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetTransactions(CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrWhiteSpace(userId))
-            return BadRequest(new { message = "El userId es requerido." });
+            return Unauthorized(new { message = "Usuario no autenticado." });
 
         var transactions = await _walletService.GetTransactionsAsync(userId, ct);
         return Ok(transactions);
