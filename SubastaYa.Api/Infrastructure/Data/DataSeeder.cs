@@ -94,8 +94,6 @@ public static class DataSeeder
                     EndTime = DateTime.UtcNow.AddHours(2),
                     State = AuctionState.Active
                 };
-                auction1.Bids.Add(new Bid { Amount = 42000m, BidderId = comprador1Id, Timestamp = DateTime.UtcNow.AddMinutes(-5) });
-                auction1.Bids.Add(new Bid { Amount = 45000m, BidderId = comprador1Id, Timestamp = DateTime.UtcNow.AddMinutes(-2) });
                 context.Auctions.Add(auction1);
             }
 
@@ -187,19 +185,32 @@ public static class DataSeeder
         }
         await context.SaveChangesAsync();
 
-        // 5. Agregar el ledger de la retención (Hold) para la subasta 1 de comprador1 si falta
-        if (userIds.TryGetValue("comprador1@test.com", out var comp1Id))
+        // 5. Restablecer exactamente el historial de pujas para la subasta 1 (comprador1 liderando a $45.000)
+        var auction1Obj = await context.Auctions.FirstOrDefaultAsync(a => a.Id == 1 || a.Title.Contains("Laptop") || a.Title.Contains("PlayStation"));
+        if (auction1Obj != null && userIds.TryGetValue("comprador1@test.com", out var comp1Id))
         {
+            var oldBids = await context.Bids.Where(b => b.AuctionId == auction1Obj.Id).ToListAsync();
+            context.Bids.RemoveRange(oldBids);
+            await context.SaveChangesAsync();
+
+            context.Bids.Add(new Bid
+            {
+                AuctionId = auction1Obj.Id,
+                BidderId = comp1Id,
+                Amount = 45000m,
+                Timestamp = DateTime.UtcNow.AddMinutes(-2)
+            });
+            await context.SaveChangesAsync();
+
             var walletComprador1 = await context.Wallets.FirstOrDefaultAsync(w => w.UserId == comp1Id);
             if (walletComprador1 != null && !await context.TransactionLedgers.AnyAsync(t => t.WalletId == walletComprador1.Id && t.Type == TransactionType.Hold))
             {
-                var auction1 = await context.Auctions.FirstOrDefaultAsync(a => a.Title.Contains("Laptop") || a.Title.Contains("PlayStation"));
                 context.TransactionLedgers.Add(new TransactionLedger
                 {
                     WalletId = walletComprador1.Id,
                     Type = TransactionType.Hold,
                     Amount = 45000m,
-                    AuctionId = auction1?.Id,
+                    AuctionId = auction1Obj.Id,
                     CreatedAt = DateTime.UtcNow.AddMinutes(-2)
                 });
                 await context.SaveChangesAsync();
