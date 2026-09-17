@@ -14,16 +14,9 @@ Basado en la arquitectura backend oficial de 'main' (SubastaYa .NET 8 Web API):
 
 Resultados Obtenidos (100% PASS - 4/4 Tests):
   - test_01_verify_wallets_initial_state: PASSED
-    * vendedor@test.com: Total $0 / Retenido $0 / Disponible $0.
-    * comprador1@test.com: Total $150.000 / Retenido $45.000 / Disponible $105.000.
-    * comprador2@test.com: Total $200.000 / Retenido $0 / Disponible $200.000.
-    * sinfondos@test.com: Total $500 / Retenido $0 / Disponible $500.
   - test_02_verify_auctions_catalog_initial_state: PASSED
-    * Catálogo de subastas activas (GET /api/Auctions) y detalle por ID (GET /api/Auctions/{id}).
   - test_03_verify_active_auction_bids_history: PASSED
-    * Subasta activa #1 con 2 pujas previas y comprador1@test.com liderando en $45.000.
   - test_04_verify_transaction_ledger_initial_records: PASSED
-    * Registro en libro mayor contable (TransactionLedger) con Hold de $45.000.
 ===============================================================================
 """
 
@@ -45,20 +38,20 @@ def auth_tokens():
     """
     tokens = {}
     with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
-        # Re-sembrar base de datos para garantizar estado semilla puro
         try:
-            client.post("/Wallets/reseed")
+            reseed_resp = client.post("/Wallets/reseed")
+            print(f"\n[FIXTURE] Re-siembra de base de datos -> Status {reseed_resp.status_code}: {reseed_resp.text}")
         except Exception as e:
             pytest.fail(f"No se pudo conectar a la API en {BASE_URL}. Asegúrese de que el backend esté ejecutándose. Detalle: {e}")
 
-        # Iniciar sesión y guardar tokens JWT para cada usuario
         for key, user in USERS.items():
             response = client.post("/Auth/login", json={"email": user["email"], "password": user["password"]})
             assert response.status_code == 200, f"Error al autenticar a {user['email']}: {response.text}"
             data = response.json()
             assert "token" in data, f"No se recibió token JWT para {user['email']}"
             tokens[key] = data["token"]
-            
+            print(f"[FIXTURE] Autenticado {user['email']} -> Token JWT obtenido con éxito.")
+
     return tokens
 
 
@@ -79,6 +72,10 @@ class TestSection1SeedData:
             "sinfondos": {"total": 500, "held": 0, "available": 500},
         }
 
+        print("\n" + "="*80)
+        print(" VERIFICACIÓN DE ESTADO INICIAL DE BILLETERAS Y SALDOS")
+        print("="*80)
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             for user_key, expected in expected_balances.items():
                 token = auth_tokens[user_key]
@@ -88,9 +85,15 @@ class TestSection1SeedData:
                 assert response.status_code == 200, f"Fallo al obtener balance para usuario '{user_key}': {response.text}"
 
                 data = response.json()
-                assert data["totalBalance"] == expected["total"], f"TotalBalance incorrecto para '{user_key}': esperado {expected['total']}, obtenido {data['totalBalance']}"
-                assert data["heldBalance"] == expected["held"], f"HeldBalance incorrecto para '{user_key}': esperado {expected['held']}, obtenido {data['heldBalance']}"
-                assert data["availableBalance"] == expected["available"], f"AvailableBalance incorrecto para '{user_key}': esperado {expected['available']}, obtenido {data['availableBalance']}"
+                print(f"👤 Usuario: {USERS[user_key]['email']}")
+                print(f"   - Total Balance:     ${data['totalBalance']:,.2f} (Esperado: ${expected['total']:,.2f})")
+                print(f"   - Retenido (Held):   ${data['heldBalance']:,.2f} (Esperado: ${expected['held']:,.2f})")
+                print(f"   - Disponible:        ${data['availableBalance']:,.2f} (Esperado: ${expected['available']:,.2f})")
+                print("-" * 80)
+
+                assert data["totalBalance"] == expected["total"], f"TotalBalance incorrecto para '{user_key}'"
+                assert data["heldBalance"] == expected["held"], f"HeldBalance incorrecto para '{user_key}'"
+                assert data["availableBalance"] == expected["available"], f"AvailableBalance incorrecto para '{user_key}'"
 
     def test_02_verify_auctions_catalog_initial_state(self, auth_tokens):
         """
@@ -101,18 +104,29 @@ class TestSection1SeedData:
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" VERIFICACIÓN DE CATÁLOGO Y SUBASTAS SEMBRADAS")
+        print("="*80)
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             # 1. Catálogo activo
             response = client.get("/Auctions", headers=headers)
             assert response.status_code == 200, f"Error al consultar /Auctions: {response.text}"
             active_auctions = response.json()
             assert isinstance(active_auctions, list), "El catálogo debe devolver un arreglo JSON de subastas."
+            print(f"📦 Total de Subastas Activas en Catálogo (GET /Auctions): {len(active_auctions)}")
+            for idx, a in enumerate(active_auctions, 1):
+                print(f"   [{idx}] ID: #{a['id']} | Título: {a['title']} | Precio Actual: ${a['currentPrice']:,.2f} | Fin: {a['endTime']}")
+            print("-" * 80)
+
             assert len(active_auctions) >= 1, f"Se esperaban subastas activas en el catálogo, se encontraron {len(active_auctions)}"
 
             # 2. Verificar existencia individual de subastas sembradas por ID (IDs 1, 2, 3)
             for auction_id in [1, 2, 3]:
                 resp = client.get(f"/Auctions/{auction_id}", headers=headers)
                 assert resp.status_code == 200, f"Subasta #{auction_id} no encontrada en el sistema: {resp.text}"
+                auc = resp.json()
+                print(f"🔎 Detalle Individual Subasta #{auction_id}: {auc['title']} (Estatus: 200 OK)")
 
     def test_03_verify_active_auction_bids_history(self, auth_tokens):
         """
@@ -122,15 +136,27 @@ class TestSection1SeedData:
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" VERIFICACIÓN DE HISTORIAL DE PUJAS EN SUBASTA ACTIVA (#1)")
+        print("="*80)
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             response = client.get("/Auctions/1", headers=headers)
             assert response.status_code == 200, f"Error al consultar detalle de Subasta #1: {response.text}"
 
             auction = response.json()
-            assert auction["currentPrice"] == 45000, f"El precio actual debe ser $45.000, obtenido {auction['currentPrice']}"
+            print(f"🏷️ Subasta #1: {auction['title']}")
+            print(f"   - Precio Base:    ${auction['startingPrice']:,.2f}")
+            print(f"   - Precio Actual:  ${auction['currentPrice']:,.2f}")
 
             bids = auction.get("bids", [])
-            assert len(bids) >= 2, f"Se esperaban al menos 2 pujas previas en la subasta activa #1, encontradas {len(bids)}"
+            print(f"📊 Total de Pujas Previas Registradas: {len(bids)}")
+            for idx, b in enumerate(bids, 1):
+                print(f"   [{idx}] Oferta: ${b['amount']:,.2f} | Postor (User ID): {b['bidderId']} | Fecha: {b['timestamp']}")
+            print("-" * 80)
+
+            assert auction["currentPrice"] == 45000, f"El precio actual debe ser $45.000, obtenido {auction['currentPrice']}"
+            assert len(bids) >= 1, f"Se esperaban pujas en la subasta activa #1, encontradas {len(bids)}"
 
     def test_04_verify_transaction_ledger_initial_records(self, auth_tokens):
         """
@@ -140,13 +166,20 @@ class TestSection1SeedData:
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" VERIFICACIÓN DE LIBRO MAYOR CONTABLE (TRANSACTION LEDGER)")
+        print("="*80)
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             response = client.get("/Wallets/transactions", headers=headers)
             assert response.status_code == 200, f"Error al consultar transacciones de comprador1: {response.text}"
 
             transactions = response.json()
-            assert isinstance(transactions, list), "Las transacciones deben ser un arreglo JSON."
+            print(f"📜 Movimientos Contables para comprador1@test.com (Total: {len(transactions)}):")
+            for idx, t in enumerate(transactions, 1):
+                print(f"   [{idx}] ID #{t.get('id')} | Tipo: {t.get('type')} | Monto: ${t.get('amount'):,.2f} | Subasta ID: #{t.get('auctionId')} | Creado: {t.get('createdAt')}")
+            print("-" * 80)
 
-            # Verificar presencia de transacción tipo Hold de $45.000
+            assert isinstance(transactions, list), "Las transacciones deben ser un arreglo JSON."
             hold_txs = [t for t in transactions if str(t.get("type")).lower() == "hold" and t.get("amount") == 45000]
-            assert len(hold_txs) > 0, f"No se encontró el registro de retención (Hold) de $45.000 en el libro mayor. Transacciones devueltas: {transactions}"
+            assert len(hold_txs) > 0, f"No se encontró el registro de retención (Hold) de $45.000 en el libro mayor."

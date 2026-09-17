@@ -60,6 +60,14 @@ class TestSection2ConcurrencyAndAntiSniping:
         bid_amount = 50000.0  # Superior a los $45.000 actuales de la subasta #1
         num_requests = 10
 
+        print("\n" + "="*80)
+        print(" PRUEBA DE CONCURRENCIA OPTIMISTA (RACE CONDITION) - POST /api/Auctions/1/bids")
+        print("="*80)
+        print(f"🚀 Disparando {num_requests} peticiones de puja en paralelo al mismo milisegundo...")
+        print(f"   - Subasta ID: #{auction_id}")
+        print(f"   - Monto a pujar: ${bid_amount:,.2f}")
+        print(f"   - Usuario: comprador2@test.com")
+
         async with httpx.AsyncClient(base_url=BASE_URL, timeout=15.0) as client:
             # Crear las N corrutinas de petición simultáneas
             tasks = [
@@ -75,6 +83,15 @@ class TestSection2ConcurrencyAndAntiSniping:
         # Conteo de respuestas
         success_count = sum(1 for s in status_codes if s in [200, 201])
         conflict_or_reject_count = sum(1 for s in status_codes if s in [409, 400, 500])
+
+        print("-" * 80)
+        print(f"📊 Resultados de las {num_requests} peticiones concurrentes:")
+        for idx, r in enumerate(responses, 1):
+            print(f"   Petición #{idx:02d}: Status HTTP {r.status_code} | Respuesta: {r.text[:100]}")
+        print("-" * 80)
+        print(f"✅ Peticiones Aceptadas (HTTP 200/201): {success_count} (Esperado: 1)")
+        print(f"🛑 Peticiones Rechazadas (HTTP 409/400/500): {conflict_or_reject_count} (Esperado: {num_requests - 1})")
+        print("="*80)
 
         assert success_count == 1, (
             f"Se esperaba exactamente 1 puja exitosa en concurrencia, se obtuvieron {success_count}. "
@@ -95,6 +112,10 @@ class TestSection2ConcurrencyAndAntiSniping:
         token = auth_tokens["comprador2"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" PRUEBA DE REGLA ANTI-SNIPING - EXTENSIÓN AUTOMÁTICA DE ENDTIME")
+        print("="*80)
+
         async with httpx.AsyncClient(base_url=BASE_URL, timeout=10.0) as client:
             # 1. Obtener el estado inicial de la subasta #2
             get_resp = await client.get("/Auctions/2", headers=headers)
@@ -103,20 +124,34 @@ class TestSection2ConcurrencyAndAntiSniping:
             initial_end_time = auction_before["endTime"]
             current_price = auction_before["currentPrice"]
 
+            print(f"⏰ Subasta #2 Inicial:")
+            print(f"   - Título: {auction_before['title']}")
+            print(f"   - Precio Actual: ${current_price:,.2f}")
+            print(f"   - EndTime Inicial: {initial_end_time}")
+
             # 2. Pujar un monto válido superior
             new_bid_amount = current_price + 5000.0
+            print(f"\n💸 Realizando oferta anti-sniping por ${new_bid_amount:,.2f}...")
             bid_resp = await client.post(
                 f"/Auctions/2/bids",
                 json={"amount": new_bid_amount},
                 headers=headers
             )
             assert bid_resp.status_code == 200, f"Error al realizar puja anti-sniping: {bid_resp.text}"
+            print(f"   - Respuesta HTTP: {bid_resp.status_code} OK")
 
             # 3. Obtener el estado actualizado de la subasta #2
             get_after_resp = await client.get("/Auctions/2", headers=headers)
             assert get_after_resp.status_code == 200
             auction_after = get_after_resp.json()
             updated_end_time = auction_after["endTime"]
+
+            print(f"\n⌛ Subasta #2 Actualizada:")
+            print(f"   - Nuevo Precio Actual: ${auction_after['currentPrice']:,.2f}")
+            print(f"   - EndTime Actualizado: {updated_end_time}")
+            print("-" * 80)
+            print(f"✅ Extensión confirmada: {initial_end_time} -> {updated_end_time} (+2 minutos)")
+            print("="*80)
 
             # 4. Verificar que EndTime fue extendida automáticamente (+2 minutos)
             assert updated_end_time > initial_end_time, (
