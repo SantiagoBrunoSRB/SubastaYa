@@ -68,7 +68,7 @@ public class AuthService : IAuthService
 
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Email!),
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(ClaimTypes.NameIdentifier, user.Id), // Claim requerido para buscar por id (ej: User.FindFirstValue(ClaimTypes.NameIdentifier))
             new Claim(ClaimTypes.Email, user.Email!)
