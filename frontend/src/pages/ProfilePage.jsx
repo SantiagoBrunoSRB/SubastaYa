@@ -1,16 +1,270 @@
-import React from 'react';
-import { User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  User,
+  Mail,
+  ShieldCheck,
+  ShoppingBag,
+  Package,
+  TrendingUp,
+  Clock,
+  ArrowUpRight,
+  Gavel,
+  Tag,
+  CheckCircle2,
+} from 'lucide-react';
+import { MOCK_USER, MOCK_AUCTIONS } from '../services/mockData';
 
 export default function ProfilePage() {
+  const [activeTab, setActiveTab] = useState('purchases'); // 'purchases' | 'publications'
+
+  const user = MOCK_USER;
+
+  // Subastas publicadas por el usuario actual (sellerId === user.id)
+  const myPublications = MOCK_AUCTIONS.filter(
+    (item) => item.sellerId === user.id
+  );
+
+  // Subastas donde el usuario ha participado (simulado para el usuario actual)
+  const myPurchases = MOCK_AUCTIONS.filter(
+    (item) => item.sellerId !== user.id
+  );
+
+  // Formateador de moneda ARS
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-        <User className="w-8 h-8 text-amber-500" />
-        <h1 className="text-2xl font-bold text-white">Mi Perfil</h1>
+    <div className="max-w-6xl mx-auto space-y-8">
+      {/* Header del Perfil / Tarjeta de Usuario */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/30 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
+          
+          {/* Avatar */}
+          <div className="relative group">
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-2 border-amber-500/40 shadow-xl"
+            />
+            <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-slate-950 p-1.5 rounded-xl shadow-lg border border-slate-900">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Datos del Usuario */}
+          <div className="space-y-2 text-center sm:text-left flex-grow">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                {user.name}
+              </h1>
+              <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 w-max mx-auto sm:mx-0">
+                Vendedor Verificado
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-slate-400 pt-1">
+              <div className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-500" />
+                <span>{user.email}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-slate-500" />
+                <span>ID: {user.id}</span>
+              </div>
+            </div>
+
+            {/* Métricas del Usuario */}
+            <div className="pt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-xl">
+              <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 text-center sm:text-left">
+                <span className="text-[11px] text-slate-500 block uppercase tracking-wider font-medium">
+                  Mis Publicaciones
+                </span>
+                <span className="text-lg font-extrabold text-white">
+                  {myPublications.length}
+                </span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 text-center sm:text-left">
+                <span className="text-[11px] text-slate-500 block uppercase tracking-wider font-medium">
+                  Mis Compras / Pujas
+                </span>
+                <span className="text-lg font-extrabold text-white">
+                  {myPurchases.length}
+                </span>
+              </div>
+
+              <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 text-center sm:text-left col-span-2 sm:col-span-1">
+                <span className="text-[11px] text-slate-500 block uppercase tracking-wider font-medium">
+                  Reputación
+                </span>
+                <span className="text-lg font-extrabold text-emerald-400">
+                  98.5% ★
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Icono decorativo de fondo */}
+        <Gavel className="absolute -right-10 -bottom-10 w-56 h-56 text-slate-800/20 rotate-12 pointer-events-none" />
       </div>
-      <div className="p-8 border border-dashed border-slate-800 rounded-xl text-center text-slate-500">
-        [Módulo 5: Vista de Perfil y Pestañas Mis Compras / Mis Publicaciones se implementará en la rama: <code className="text-amber-400">feature/frontend-user-profile</code>]
+
+      {/* Control de Pestañas (Tabs) */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('purchases')}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'purchases'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <ShoppingBag className="w-4 h-4" />
+          Mis Compras y Pujas ({myPurchases.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('publications')}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+            activeTab === 'publications'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10'
+              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          Mis Publicaciones ({myPublications.length})
+        </button>
       </div>
+
+      {/* Contenido de la Pestaña activa */}
+      {activeTab === 'purchases' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Subastas en las que estás participando o has ganado</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {myPurchases.map((item) => (
+              <div
+                key={item.id}
+                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex gap-4 items-center hover:border-slate-700 transition-colors"
+              >
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-20 h-20 rounded-xl object-cover bg-slate-950 shrink-0"
+                />
+                <div className="space-y-1 flex-grow min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-amber-400 font-semibold truncate">
+                      {item.category}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        item.status === 'ACTIVE'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {item.status === 'ACTIVE' ? 'En Curso' : 'Finalizada'}
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-white text-sm truncate">
+                    {item.title}
+                  </h4>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="text-slate-400">
+                      Última Oferta:{' '}
+                      <strong className="text-white">
+                        {formatCurrency(item.currentPrice)}
+                      </strong>
+                    </span>
+                    <Link
+                      to={`/subasta/${item.id}`}
+                      className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-semibold"
+                    >
+                      Ver Sala
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'publications' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Subastas creadas por ti en la plataforma</span>
+            <Link
+              to="/crear-subasta"
+              className="text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-4"
+            >
+              + Publicar nueva subasta
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {myPublications.map((item) => (
+              <div
+                key={item.id}
+                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex gap-4 items-center hover:border-slate-700 transition-colors"
+              >
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-20 h-20 rounded-xl object-cover bg-slate-950 shrink-0"
+                />
+                <div className="space-y-1 flex-grow min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-amber-400 font-semibold truncate">
+                      {item.category}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        item.status === 'ACTIVE'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {item.status === 'ACTIVE' ? 'Activa' : 'Finalizada'}
+                    </span>
+                  </div>
+
+                  <h4 className="font-bold text-white text-sm truncate">
+                    {item.title}
+                  </h4>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="text-slate-400">
+                      Pujas recibidas:{' '}
+                      <strong className="text-white">{item.bidCount}</strong> |{' '}
+                      {formatCurrency(item.currentPrice)}
+                    </span>
+                    <Link
+                      to={`/subasta/${item.id}`}
+                      className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-semibold"
+                    >
+                      Ver Detalle
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
