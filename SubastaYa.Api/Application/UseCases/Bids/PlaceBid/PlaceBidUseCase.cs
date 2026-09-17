@@ -97,7 +97,7 @@ public class PlaceBidUseCase
         }
         catch (DbUpdateConcurrencyException)
         {
-            throw new DomainException("Otra puja fue realizada al mismo tiempo. Por favor, intenta de nuevo con un monto mayor.");
+            throw;
         }
     }
 }
