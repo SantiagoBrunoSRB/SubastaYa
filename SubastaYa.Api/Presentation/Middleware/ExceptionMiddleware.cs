@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SubastaYa.Api.Domain.Exceptions;
 
 namespace SubastaYa.Api.Presentation.Middleware;
@@ -20,6 +21,22 @@ public class ExceptionMiddleware
         try
         {
             await _next(context);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(ex, "Concurrency Exception: {Message}", ex.Message);
+            
+            context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+            context.Response.ContentType = "application/json";
+
+            var problem = new ProblemDetails
+            {
+                Status = (int)HttpStatusCode.Conflict,
+                Title = "Conflicto de concurrencia",
+                Detail = "Otra puja fue procesada simultáneamente. Por favor, intente nuevamente."
+            };
+
+            await context.Response.WriteAsJsonAsync(problem);
         }
         catch (DomainException ex)
         {
