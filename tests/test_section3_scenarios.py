@@ -44,14 +44,24 @@ class TestSection3BusinessScenarios:
         """
         Prueba de Rechazo por Fondos Insuficientes:
         El usuario sinfondos@test.com posee $500 disponibles.
-        Intenta realizar una puja por $10.000 en la subasta activa #1.
+        Intenta realizar una puja por $50.000 en la subasta activa #1.
         Debe ser rechazado con HTTP 400 Bad Request.
         """
         token = auth_tokens["sinfondos"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" PRUEBA DE RECHAZO POR FONDOS INSUFICIENTES")
+        print("="*80)
+        print("👤 Usuario: sinfondos@test.com (Saldo disponible: $500)")
+        print("💸 Intentando ofertar $50.000 en Subasta #1...")
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             response = client.post("/Auctions/1/bids", json={"amount": 50000.0}, headers=headers)
+            print(f"🛑 Respuesta del Backend -> Status HTTP {response.status_code}")
+            print(f"   Detalle JSON: {response.text}")
+            print("-" * 80)
+
             assert response.status_code == 400, f"Se esperaba rechazo HTTP 400 por fondos insuficientes, se obtuvo {response.status_code}: {response.text}"
             
             data = response.json()
@@ -67,8 +77,18 @@ class TestSection3BusinessScenarios:
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" PRUEBA DE BLOQUEO DE PUJA EN SUBASTA PRÓXIMA (NO INICIADA)")
+        print("="*80)
+        print("📅 Subasta #3: Inicio programado a +24 hs")
+        print("💸 Intentando ofertar $60.000...")
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             response = client.post("/Auctions/3/bids", json={"amount": 60000.0}, headers=headers)
+            print(f"🛑 Respuesta del Backend -> Status HTTP {response.status_code}")
+            print(f"   Detalle JSON: {response.text}")
+            print("-" * 80)
+
             assert response.status_code == 400, f"Se esperaba rechazo HTTP 400 por subasta no iniciada, se obtuvo {response.status_code}: {response.text}"
 
             data = response.json()
@@ -88,21 +108,37 @@ class TestSection3BusinessScenarios:
         headers1 = {"Authorization": f"Bearer {token1}"}
         headers2 = {"Authorization": f"Bearer {token2}"}
 
+        print("\n" + "="*80)
+        print(" PRUEBA DE LIBERACIÓN AUTOMÁTICA DE ESCROW (SALDO RETENIDO)")
+        print("="*80)
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             # 1. Verificar balance inicial de comprador1 (45.000 retenidos)
             resp1 = client.get("/Wallets/balance", headers=headers1)
             assert resp1.status_code == 200
             bal1_before = resp1.json()
+            print(f"👤 Estado inicial de comprador1@test.com:")
+            print(f"   - Retenido (Held):   ${bal1_before['heldBalance']:,.2f}")
+            print(f"   - Disponible:        ${bal1_before['availableBalance']:,.2f}")
             assert bal1_before["heldBalance"] == 45000
 
             # 2. comprador2 realiza sobre-puja de $55.000
+            print(f"\n🚀 comprador2@test.com realiza sobre-puja de $55.000 en Subasta #1...")
             bid_resp = client.post("/Auctions/1/bids", json={"amount": 55000.0}, headers=headers2)
             assert bid_resp.status_code == 200, f"Error al realizar sobre-puja: {bid_resp.text}"
+            print(f"   - Respuesta HTTP: {bid_resp.status_code} OK")
 
             # 3. Verificar que comprador1 recuperó su saldo retenido (heldBalance = 0, availableBalance = 150000)
             resp1_after = client.get("/Wallets/balance", headers=headers1)
             assert resp1_after.status_code == 200
             bal1_after = resp1_after.json()
+            print(f"\n👤 Estado posterior de comprador1@test.com (Tras ser superado):")
+            print(f"   - Retenido (Held):   ${bal1_after['heldBalance']:,.2f} (Esperado: $0.00)")
+            print(f"   - Disponible:        ${bal1_after['availableBalance']:,.2f} (Esperado: $150,000.00)")
+            print("-" * 80)
+            print("✅ Liberación de Escrow confirmada: El saldo retenido retornó 100% al disponible de comprador1.")
+            print("="*80)
+
             assert bal1_after["heldBalance"] == 0, f"El saldo retenido de comprador1 debió ser 0 tras la sobre-puja, se obtuvo {bal1_after['heldBalance']}"
             assert bal1_after["availableBalance"] == 150000, f"El saldo disponible de comprador1 debió ser $150.000, se obtuvo {bal1_after['availableBalance']}"
 
@@ -114,7 +150,15 @@ class TestSection3BusinessScenarios:
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
 
+        print("\n" + "="*80)
+        print(" VERIFICACIÓN DE SUBASTAS VENCIDAS (#4 Y #5)")
+        print("="*80)
+
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             for auction_id in [4, 5]:
                 resp = client.get(f"/Auctions/{auction_id}", headers=headers)
                 assert resp.status_code == 200, f"Subasta vencida #{auction_id} no encontrada: {resp.text}"
+                auc = resp.json()
+                print(f"🏷️ Subasta Vencida #{auction_id}: {auc['title']}")
+                print(f"   - Precio Final: ${auc['currentPrice']:,.2f} | EndTime: {auc['endTime']}")
+            print("-" * 80)
