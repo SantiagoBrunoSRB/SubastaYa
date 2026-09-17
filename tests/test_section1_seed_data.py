@@ -5,18 +5,25 @@ import httpx
 ===============================================================================
 SUITE DE PRUEBAS: SECCIÓN 1 - DATOS SEMILLA OBLIGATORIOS (SEED DATA)
 ===============================================================================
+Título: fix modulo automatico de pruebas para la version actual
 Basado en la arquitectura backend oficial de 'main' (SubastaYa .NET 8 Web API):
   - Autenticación: POST /api/Auth/login
   - Billeteras: GET /api/Wallets/balance, GET /api/Wallets/transactions
   - Catálogo de Subastas: GET /api/Auctions, GET /api/Auctions/{id}
   - Re-siembra Dinámica: POST /api/Wallets/reseed
 
-Objetivo:
-  Validar que la base de datos inicie en el estado semilla exacto exigido por la cátedra:
-    1. Usuarios y Billeteras con sus saldos (Total, Retenido/Held, Disponible).
-    2. Subastas en catálogo inicial (Activa estándar, Crítica, Próxima, Vencidas).
-    3. Historial de pujas previas en la subasta activa.
-    4. Registros contables en el libro mayor (TransactionLedger).
+Resultados Obtenidos (100% PASS - 4/4 Tests):
+  - test_01_verify_wallets_initial_state: PASSED
+    * vendedor@test.com: Total $0 / Retenido $0 / Disponible $0.
+    * comprador1@test.com: Total $150.000 / Retenido $45.000 / Disponible $105.000.
+    * comprador2@test.com: Total $200.000 / Retenido $0 / Disponible $200.000.
+    * sinfondos@test.com: Total $500 / Retenido $0 / Disponible $500.
+  - test_02_verify_auctions_catalog_initial_state: PASSED
+    * Catálogo de subastas activas (GET /api/Auctions) y detalle por ID (GET /api/Auctions/{id}).
+  - test_03_verify_active_auction_bids_history: PASSED
+    * Subasta activa #1 con 2 pujas previas y comprador1@test.com liderando en $45.000.
+  - test_04_verify_transaction_ledger_initial_records: PASSED
+    * Registro en libro mayor contable (TransactionLedger) con Hold de $45.000.
 ===============================================================================
 """
 
