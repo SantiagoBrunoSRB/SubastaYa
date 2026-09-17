@@ -44,15 +44,20 @@ public class PlaceBidUseCase
 
         var highestBid = await _bidRepository.GetHighestBidForAuctionAsync(auctionId, cancellationToken);
 
-        // 1. Sustitución atómica de retención de fondos (Liberar anterior postor + Retener nuevo postor)
-        await _walletService.ReplaceHoldAsync(
-            highestBid?.BidderId,
-            highestBid?.Amount,
-            bidderId,
-            request.Amount,
-            auctionId,
-            cancellationToken);
+        // 1. Validar fondos
+        var hasFunds = await _walletService.HasSufficientBalanceAsync(bidderId, request.Amount, cancellationToken);
+        if (!hasFunds)
+            throw new DomainException("No tienes fondos suficientes en tu billetera.");
 
+        // 2. Liberar saldo del postor anterior y retener del nuevo (Escrow)
+        await _walletService.ReplaceHoldAsync(
+            previousBidderId: highestBid?.BidderId,
+            previousAmount: highestBid?.Amount,
+            newBidderId: bidderId,
+            newAmount: request.Amount,
+            auctionId: auctionId,
+            ct: cancellationToken
+        );
 
         // 3. Registrar nueva puja
         var bid = new Bid
