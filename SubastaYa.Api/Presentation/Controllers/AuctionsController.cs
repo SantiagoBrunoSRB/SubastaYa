@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SubastaYa.Api.Application.DTOs.Auctions;
 using SubastaYa.Api.Application.DTOs.Bids;
@@ -7,6 +8,7 @@ using SubastaYa.Api.Application.UseCases.Bids.PlaceBid;
 
 namespace SubastaYa.Api.Presentation.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/auctions")]
 public class AuctionsController : ControllerBase
