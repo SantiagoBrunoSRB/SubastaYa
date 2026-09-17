@@ -15,44 +15,27 @@ public static class DbSeeder
         // 1. Asegurar que las migraciones estén aplicadas en MySQL
         await context.Database.MigrateAsync();
 
-        // Si ya existen usuarios, no volver a sembrar para evitar duplicados
-        if (await context.Users.AnyAsync())
+        // 2. Crear Usuarios de Prueba (Identity) si no existen
+        async Task<IdentityUser> GetOrCreateUserAsync(string email)
+        {
+            var user = await userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                user = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
+                await userManager.CreateAsync(user, "Password123!");
+            }
+            return user;
+        }
+
+        var sellerUser = await GetOrCreateUserAsync("vendedor@test.com");
+        var buyer1User = await GetOrCreateUserAsync("comprador1@test.com");
+        var buyer2User = await GetOrCreateUserAsync("comprador2@test.com");
+        var noFundsUser = await GetOrCreateUserAsync("sinfondos@test.com");
+
+        if (await context.Auctions.AnyAsync())
         {
             return;
         }
-
-        // 2. Crear Usuarios de Prueba (Identity)
-        var sellerUser = new IdentityUser
-        {
-            UserName = "vendedor@test.com",
-            Email = "vendedor@test.com",
-            EmailConfirmed = true
-        };
-        await userManager.CreateAsync(sellerUser, "Password123!");
-
-        var buyer1User = new IdentityUser
-        {
-            UserName = "comprador1@test.com",
-            Email = "comprador1@test.com",
-            EmailConfirmed = true
-        };
-        await userManager.CreateAsync(buyer1User, "Password123!");
-
-        var buyer2User = new IdentityUser
-        {
-            UserName = "comprador2@test.com",
-            Email = "comprador2@test.com",
-            EmailConfirmed = true
-        };
-        await userManager.CreateAsync(buyer2User, "Password123!");
-
-        var noFundsUser = new IdentityUser
-        {
-            UserName = "sinfondos@test.com",
-            Email = "sinfondos@test.com",
-            EmailConfirmed = true
-        };
-        await userManager.CreateAsync(noFundsUser, "Password123!");
 
         // 3. Crear Billeteras (Wallets) según especificaciones de la cátedra
         var sellerWallet = new Wallet

@@ -33,6 +33,7 @@ public class AuctionsController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAuctions(CancellationToken cancellationToken)
     {
         var auctions = await _getAuctionsUseCase.ExecuteAsync(cancellationToken);
@@ -40,6 +41,7 @@ public class AuctionsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(AuctionDetailResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAuction(int id, CancellationToken cancellationToken)
