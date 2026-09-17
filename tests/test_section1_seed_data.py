@@ -5,16 +5,24 @@ import httpx
 ===============================================================================
 SUITE DE PRUEBAS: SECCIÓN 1 - DATOS SEMILLA OBLIGATORIOS (SEED DATA)
 ===============================================================================
-Objetivo: Validar que el sistema inicie en un estado conocido y reproducible,
-verificando la presencia de los 4 usuarios con sus saldos exactos (Total, Retenido/Held,
-Disponible), las subastas sembradas en el catálogo, el historial de pujas
-previas y los registros contables en el libro mayor (TransactionLedger).
+Basado en la arquitectura backend oficial de 'main' (SubastaYa .NET 8 Web API):
+  - Autenticación: POST /api/Auth/login
+  - Billeteras: GET /api/Wallets/balance, GET /api/Wallets/transactions
+  - Catálogo de Subastas: GET /api/Auctions, GET /api/Auctions/{id}
+  - Re-siembra Dinámica: POST /api/Wallets/reseed
+
+Objetivo:
+  Validar que la base de datos inicie en el estado semilla exacto exigido por la cátedra:
+    1. Usuarios y Billeteras con sus saldos (Total, Retenido/Held, Disponible).
+    2. Subastas en catálogo inicial (Activa estándar, Crítica, Próxima, Vencidas).
+    3. Historial de pujas previas en la subasta activa.
+    4. Registros contables en el libro mayor (TransactionLedger).
 ===============================================================================
 """
 
 BASE_URL = "http://localhost:5110/api"
 
-# Credenciales de los 4 usuarios semilla exigidos
+# Credenciales de los 4 usuarios semilla exigidos por la cátedra
 USERS = {
     "vendedor": {"email": "vendedor@test.com", "password": "Password123!"},
     "comprador1": {"email": "comprador1@test.com", "password": "Password123!"},
@@ -24,18 +32,26 @@ USERS = {
 
 @pytest.fixture(scope="module")
 def auth_tokens():
-    """Fixture que re-siembra la base de datos a su estado inicial, inicia sesión con los 4 usuarios semilla y devuelve sus JWT Tokens."""
+    """
+    Fixture que re-siembra la base de datos a su estado inicial mediante POST /api/Wallets/reseed,
+    inicia sesión con los 4 usuarios semilla vía POST /api/Auth/login y devuelve un diccionario de tokens JWT.
+    """
     tokens = {}
     with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
         # Re-sembrar base de datos para garantizar estado semilla puro
-        client.post("/Wallets/reseed")
+        try:
+            client.post("/Wallets/reseed")
+        except Exception as e:
+            pytest.fail(f"No se pudo conectar a la API en {BASE_URL}. Asegúrese de que el backend esté ejecutándose. Detalle: {e}")
 
+        # Iniciar sesión y guardar tokens JWT para cada usuario
         for key, user in USERS.items():
             response = client.post("/Auth/login", json={"email": user["email"], "password": user["password"]})
             assert response.status_code == 200, f"Error al autenticar a {user['email']}: {response.text}"
             data = response.json()
-            assert "token" in data, f"No se recibió token para {user['email']}"
+            assert "token" in data, f"No se recibió token JWT para {user['email']}"
             tokens[key] = data["token"]
+            
     return tokens
 
 
@@ -44,10 +60,10 @@ class TestSection1SeedData:
     def test_01_verify_wallets_initial_state(self, auth_tokens):
         """
         Verifica que las billeteras de los 4 usuarios contengan las métricas financieras exactas:
-        - vendedor@test.com: Total $0 / Retenido $0 / Disponible $0.
-        - comprador1@test.com: Total $150.000 / Retenido $45.000 / Disponible $105.000.
-        - comprador2@test.com: Total $200.000 / Retenido $0 / Disponible $200.000.
-        - sinfondos@test.com: Total $500 / Retenido $0 / Disponible $500.
+          - vendedor@test.com: Total $0 / Retenido $0 / Disponible $0.
+          - comprador1@test.com: Total $150.000 / Retenido $45.000 / Disponible $105.000.
+          - comprador2@test.com: Total $200.000 / Retenido $0 / Disponible $200.000.
+          - sinfondos@test.com: Total $500 / Retenido $0 / Disponible $500.
         """
         expected_balances = {
             "vendedor": {"total": 0, "held": 0, "available": 0},
@@ -62,18 +78,18 @@ class TestSection1SeedData:
                 headers = {"Authorization": f"Bearer {token}"}
 
                 response = client.get("/Wallets/balance", headers=headers)
-                assert response.status_code == 200, f"Fallo al obtener balance para {user_key}: {response.text}"
+                assert response.status_code == 200, f"Fallo al obtener balance para usuario '{user_key}': {response.text}"
 
                 data = response.json()
-                assert data["totalBalance"] == expected["total"], f"TotalBalance incorrecto para {user_key}"
-                assert data["heldBalance"] == expected["held"], f"HeldBalance incorrecto para {user_key}"
-                assert data["availableBalance"] == expected["available"], f"AvailableBalance incorrecto para {user_key}"
+                assert data["totalBalance"] == expected["total"], f"TotalBalance incorrecto para '{user_key}': esperado {expected['total']}, obtenido {data['totalBalance']}"
+                assert data["heldBalance"] == expected["held"], f"HeldBalance incorrecto para '{user_key}': esperado {expected['held']}, obtenido {data['heldBalance']}"
+                assert data["availableBalance"] == expected["available"], f"AvailableBalance incorrecto para '{user_key}': esperado {expected['available']}, obtenido {data['availableBalance']}"
 
     def test_02_verify_auctions_catalog_initial_state(self, auth_tokens):
         """
-        Verifica que el catálogo devuelva las subastas en su estado inicial.
-        - GET /Auctions devuelve las subastas activas (al menos 2 o 3 activas según el tiempo).
-        - GET /Auctions/{id} confirma la existencia de las subastas semilla creadas.
+        Verifica que el catálogo responda correctamente a las solicitudes GET /Auctions y GET /Auctions/{id}:
+          - GET /Auctions (Acceso Anónimo / Autenticado): Devuelve la lista de subastas activas.
+          - GET /Auctions/{id}: Confirma la existencia individual de las subastas sembradas.
         """
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
@@ -83,36 +99,36 @@ class TestSection1SeedData:
             response = client.get("/Auctions", headers=headers)
             assert response.status_code == 200, f"Error al consultar /Auctions: {response.text}"
             active_auctions = response.json()
-            assert isinstance(active_auctions, list), "El catálogo debe devolver una lista de subastas."
-            assert len(active_auctions) >= 2, f"Se esperaban al menos subastas activas en catálogo, se encontraron {len(active_auctions)}"
+            assert isinstance(active_auctions, list), "El catálogo debe devolver un arreglo JSON de subastas."
+            assert len(active_auctions) >= 2, f"Se esperaban subastas activas en el catálogo, se encontraron {len(active_auctions)}"
 
-            # 2. Verificar existencia individual de las subastas sembradas
-            for auction_id in range(1, 4):
+            # 2. Verificar existencia individual de subastas sembradas por ID (IDs 1, 2, 3)
+            for auction_id in [1, 2, 3]:
                 resp = client.get(f"/Auctions/{auction_id}", headers=headers)
-                assert resp.status_code == 200, f"Subasta #{auction_id} no encontrada: {resp.text}"
+                assert resp.status_code == 200, f"Subasta #{auction_id} no encontrada en el sistema: {resp.text}"
 
     def test_03_verify_active_auction_bids_history(self, auth_tokens):
         """
-        Verifica que la Subasta Activa Estándar (ID #1) contenga las 2 pujas previas cargadas,
-        con el comprador1@test.com como líder en $45.000.
+        Verifica que la Subasta Activa Estándar (ID #1) contenga las pujas previas cargadas,
+        con el usuario comprador1@test.com como postor líder en $45.000.
         """
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
 
         with httpx.Client(base_url=BASE_URL, timeout=10.0) as client:
             response = client.get("/Auctions/1", headers=headers)
-            assert response.status_code == 200, f"Error al obtener detalle de Subasta 1: {response.text}"
+            assert response.status_code == 200, f"Error al consultar detalle de Subasta #1: {response.text}"
 
             auction = response.json()
             assert auction["currentPrice"] == 45000, f"El precio actual debe ser $45.000, obtenido {auction['currentPrice']}"
 
             bids = auction.get("bids", [])
-            assert len(bids) >= 2, f"Se esperaban al menos 2 pujas previas en la subasta activa, encontradas {len(bids)}"
+            assert len(bids) >= 2, f"Se esperaban al menos 2 pujas previas en la subasta activa #1, encontradas {len(bids)}"
 
     def test_04_verify_transaction_ledger_initial_records(self, auth_tokens):
         """
-        Verifica los registros contables en el libro mayor (TransactionLedger) para comprador1@test.com,
-        confirmando que existan el depósito inicial y el saldo retenido de $45.000 (Hold).
+        Verifica los registros contables en el libro mayor (TransactionLedger) para comprador1@test.com
+        vía GET /Wallets/transactions, confirmando la presencia del saldo retenido de $45.000 (Hold).
         """
         token = auth_tokens["comprador1"]
         headers = {"Authorization": f"Bearer {token}"}
@@ -122,8 +138,8 @@ class TestSection1SeedData:
             assert response.status_code == 200, f"Error al consultar transacciones de comprador1: {response.text}"
 
             transactions = response.json()
-            assert isinstance(transactions, list), "Las transacciones deben ser una lista."
+            assert isinstance(transactions, list), "Las transacciones deben ser un arreglo JSON."
 
-            # Verificar presencia de transacción tipo Hold de 45.000
+            # Verificar presencia de transacción tipo Hold de $45.000
             hold_txs = [t for t in transactions if str(t.get("type")).lower() == "hold" and t.get("amount") == 45000]
-            assert len(hold_txs) > 0, f"No se encontró el registro de retención (Hold) de $45.000 en el libro mayor. Transacciones encontradas: {transactions}"
+            assert len(hold_txs) > 0, f"No se encontró el registro de retención (Hold) de $45.000 en el libro mayor. Transacciones devueltas: {transactions}"
