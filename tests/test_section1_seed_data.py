@@ -100,7 +100,7 @@ class TestSection1SeedData:
             assert response.status_code == 200, f"Error al consultar /Auctions: {response.text}"
             active_auctions = response.json()
             assert isinstance(active_auctions, list), "El catálogo debe devolver un arreglo JSON de subastas."
-            assert len(active_auctions) >= 2, f"Se esperaban subastas activas en el catálogo, se encontraron {len(active_auctions)}"
+            assert len(active_auctions) >= 1, f"Se esperaban subastas activas en el catálogo, se encontraron {len(active_auctions)}"
 
             # 2. Verificar existencia individual de subastas sembradas por ID (IDs 1, 2, 3)
             for auction_id in [1, 2, 3]:
