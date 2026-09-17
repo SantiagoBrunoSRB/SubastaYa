@@ -14,17 +14,20 @@ public class PlaceBidUseCase
     private readonly IBidRepository _bidRepository;
     private readonly IWalletService _walletService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditLogRepository _auditLogRepository;
 
     public PlaceBidUseCase(
         IAuctionRepository auctionRepository, 
         IBidRepository bidRepository, 
         IWalletService walletService, 
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditLogRepository auditLogRepository)
     {
         _auctionRepository = auctionRepository;
         _bidRepository = bidRepository;
         _walletService = walletService;
         _unitOfWork = unitOfWork;
+        _auditLogRepository = auditLogRepository;
     }
 
     public async Task ExecuteAsync(int auctionId, string bidderId, PlaceBidRequestDto request, CancellationToken cancellationToken = default)
@@ -77,6 +80,13 @@ public class PlaceBidUseCase
         if (timeLeft.TotalSeconds < 60)
         {
             auction.EndTime = auction.EndTime.AddMinutes(2);
+            await _auditLogRepository.AddAsync(new AuditLog
+            {
+                Action = "AntiSnipingRuleTriggered",
+                UserId = bidderId,
+                Details = $"Extensión de 2 minutos aplicada a la subasta {auctionId}. Nueva fecha de fin: {auction.EndTime:O}",
+                Timestamp = DateTime.UtcNow
+            }, cancellationToken);
         }
 
         await _auctionRepository.UpdateAsync(auction, cancellationToken);
