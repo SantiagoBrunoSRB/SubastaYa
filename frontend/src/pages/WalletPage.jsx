@@ -66,6 +66,20 @@ export default function WalletPage() {
             >
               Comprador 2
             </button>
+            <button
+              onClick={() => login('vendedor@test.com', 'Password123!')}
+              disabled={isLoading}
+              className="text-xs bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded-lg border border-emerald-500/30 transition-colors disabled:opacity-50"
+            >
+              Vendedor
+            </button>
+            <button
+              onClick={() => login('sinfondos@test.com', 'Password123!')}
+              disabled={isLoading}
+              className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1.5 rounded-lg border border-red-500/30 transition-colors disabled:opacity-50"
+            >
+              Sin Fondos
+            </button>
           </div>
         )}
       </div>
@@ -80,7 +94,7 @@ export default function WalletPage() {
             disabled={isLoading}
             className="w-fit whitespace-nowrap bg-amber-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-amber-400 transition-colors"
           >
-            Ingresar como Comprador 1
+            Elegir usuario ↑
           </button>
         </div>
       )}
