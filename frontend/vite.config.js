@@ -5,5 +5,19 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5110',
+        changeOrigin: true,
+      },
+      '/auctionHub': {
+        target: 'http://localhost:5110',
+        ws: true,
+        changeOrigin: true,
+      },
+    },
+  },
 })
 

@@ -3,7 +3,7 @@ import { Wallet, ArrowDownToLine, Activity } from 'lucide-react';
 import { useWallet } from '../contexts/WalletContext';
 
 export default function WalletPage() {
-  const { balance, transactions, deposit, isLoading, error } = useWallet();
+  const { balance, transactions, deposit, isLoading, error, isAuthenticated, userEmail, login, logout } = useWallet();
   const [depositAmount, setDepositAmount] = useState('');
   const [localError, setLocalError] = useState(null);
 
@@ -31,10 +31,59 @@ export default function WalletPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-        <Wallet className="w-8 h-8 text-amber-500" />
-        <h1 className="text-2xl font-bold text-white">Mi Billetera</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <Wallet className="w-8 h-8 text-amber-500" />
+          <h1 className="text-2xl font-bold text-white">Mi Billetera</h1>
+        </div>
+
+        {isAuthenticated ? (
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-slate-400">
+              Usuario: <strong className="text-amber-400 font-semibold">{userEmail}</strong>
+            </span>
+            <button
+              onClick={logout}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-400">Iniciar sesión demo:</span>
+            <button
+              onClick={() => login('comprador1@test.com', 'Password123!')}
+              disabled={isLoading}
+              className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-3 py-1.5 rounded-lg border border-amber-500/30 transition-colors disabled:opacity-50"
+            >
+              Comprador 1
+            </button>
+            <button
+              onClick={() => login('comprador2@test.com', 'Password123!')}
+              disabled={isLoading}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors disabled:opacity-50"
+            >
+              Comprador 2
+            </button>
+          </div>
+        )}
       </div>
+
+      {!isAuthenticated && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span>
+            ⚠️ Para consultar tu saldo real y realizar depósitos en la base de datos debes iniciar sesión.
+          </span>
+          <button
+            onClick={() => login('comprador1@test.com', 'Password123!')}
+            disabled={isLoading}
+            className="w-fit whitespace-nowrap bg-amber-500 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-amber-400 transition-colors"
+          >
+            Ingresar como Comprador 1
+          </button>
+        </div>
+      )}
 
       {(error || localError) && (
         <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
@@ -137,8 +186,8 @@ export default function WalletPage() {
                             {tx.type}
                           </span>
                         </td>
-                        <td className="px-6 py-4 truncate max-w-[200px]" title={tx.description}>
-                          {tx.description}
+                        <td className="px-6 py-4 truncate max-w-[200px]" title={tx.description || tx.type}>
+                          {tx.description || (tx.auctionId ? `Subasta #${tx.auctionId}` : (tx.type === 'Deposit' ? 'Depósito de fondos' : (tx.type === 'Hold' ? 'Retención por puja' : (tx.type === 'Release' ? 'Liberación de fondos' : tx.type))))}
                         </td>
                         <td className={`px-6 py-4 text-right font-medium ${
                           tx.amount > 0 ? 'text-green-400' : 'text-white'

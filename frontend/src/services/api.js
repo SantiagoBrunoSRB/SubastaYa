@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'http://localhost:5110/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export async function fetchWithAuth(endpoint, options = {}) {
     const token = localStorage.getItem('token');
@@ -18,13 +18,16 @@ export async function fetchWithAuth(endpoint, options = {}) {
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     if (!response.ok) {
+        if (response.status === 401) {
+            throw new Error('Usuario no autenticado o sesión expirada. Por favor inicia sesión.');
+        }
         let errorData;
         try {
             errorData = await response.json();
         } catch {
             errorData = { message: response.statusText };
         }
-        throw new Error(errorData.message || 'Error en la petición a la API');
+        throw new Error(errorData.message || errorData.title || 'Error en la petición a la API');
     }
 
     // Handle 204 No Content
