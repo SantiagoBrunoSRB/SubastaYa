@@ -6,19 +6,22 @@ import CreateAuctionPage from './pages/CreateAuctionPage';
 import ProfilePage from './pages/ProfilePage';
 import AuctionDetailPage from './pages/AuctionDetailPage';
 import WalletPage from './pages/WalletPage';
+import { WalletProvider } from './contexts/WalletContext';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="crear-subasta" element={<CreateAuctionPage />} />
-          <Route path="mi-perfil" element={<ProfilePage />} />
-          <Route path="subasta/:id" element={<AuctionDetailPage />} />
-          <Route path="billetera" element={<WalletPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <WalletProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<HomePage />} />
+            <Route path="crear-subasta" element={<CreateAuctionPage />} />
+            <Route path="mi-perfil" element={<ProfilePage />} />
+            <Route path="subasta/:id" element={<AuctionDetailPage />} />
+            <Route path="billetera" element={<WalletPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </WalletProvider>
   );
 }
