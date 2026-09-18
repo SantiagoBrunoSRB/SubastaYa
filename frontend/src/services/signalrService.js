@@ -10,8 +10,9 @@ class SignalRService {
             return Promise.resolve();
         }
 
+        const hubUrl = import.meta.env.VITE_HUB_URL || '/auctionHub';
         this.connection = new signalR.HubConnectionBuilder()
-            .withUrl('http://localhost:5110/auctionHub')
+            .withUrl(hubUrl)
             .withAutomaticReconnect()
             .build();
 
