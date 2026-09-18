@@ -14,5 +14,6 @@ public class AuctionDetailResponseDto
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public AuctionState State { get; set; }
+    public string? ImageUrl { get; set; }
     public List<BidDto> Bids { get; set; } = new();
 }

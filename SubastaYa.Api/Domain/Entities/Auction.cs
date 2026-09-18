@@ -11,6 +11,7 @@ public class Auction
     public string Category { get; set; } = string.Empty;
     public decimal StartingPrice { get; set; }
     public decimal CurrentPrice { get; set; }
+    public string? ImageUrl { get; set; }
     
     public string SellerId { get; set; } = string.Empty; // Relacion con IdentityUser
     

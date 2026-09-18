@@ -13,4 +13,5 @@ public class AuctionResponseDto
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
     public AuctionState State { get; set; }
+    public string? ImageUrl { get; set; }
 }
