@@ -1,18 +1,139 @@
-import React, { useState, useMemo } from 'react';
-import { Gavel, TrendingUp, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Gavel, TrendingUp, Sparkles, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import AuctionFilter from '../components/auctions/AuctionFilter';
 import AuctionGrid from '../components/auctions/AuctionGrid';
 import { MOCK_AUCTIONS } from '../services/mockData';
+import { fetchWithAuth } from '../services/api';
+
+// Detecta categoría automáticamente según título/descripción si el backend no la provee
+const mapCategory = (title = '', description = '') => {
+  const text = `${title} ${description}`.toLowerCase();
+  if (text.includes('tecnología') || text.includes('laptop') || text.includes('smartphone') || text.includes('oled') || text.includes('electrónica')) {
+    return 'Electrónica';
+  }
+  if (text.includes('cómic') || text.includes('reloj') || text.includes('coleccionable') || text.includes('vintage')) {
+    return 'Coleccionables';
+  }
+  if (text.includes('cuadro') || text.includes('óleo') || text.includes('arte') || text.includes('pintura')) {
+    return 'Arte';
+  }
+  if (text.includes('auto') || text.includes('moto') || text.includes('vehículo') || text.includes('camioneta')) {
+    return 'Vehículos';
+  }
+  if (text.includes('bici') || text.includes('deporte') || text.includes('camiseta') || text.includes('futbol')) {
+    return 'Deportes';
+  }
+  if (text.includes('hogar') || text.includes('mueble') || text.includes('silla')) {
+    return 'Hogar';
+  }
+  return 'Electrónica';
+};
+
+// Asigna una imagen estética si el backend no cuenta con URL de imagen
+const mapImage = (title = '', category = '') => {
+  const text = title.toLowerCase();
+  if (text.includes('laptop') || text.includes('gamer') || text.includes('rtx')) {
+    return 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=800&q=80';
+  }
+  if (text.includes('smartphone') || text.includes('oled') || text.includes('flagship')) {
+    return 'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=800&q=80';
+  }
+  if (text.includes('cómic') || text.includes('comic')) {
+    return 'https://images.unsplash.com/photo-1588497859490-85d1c17db96d?auto=format&fit=crop&w=800&q=80';
+  }
+  if (text.includes('reloj')) {
+    return 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80';
+  }
+  if (text.includes('óleo') || text.includes('arte') || text.includes('pintura')) {
+    return 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80';
+  }
+  if (category === 'Vehículos') {
+    return 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80';
+  }
+  if (category === 'Deportes') {
+    return 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80';
+};
+
+// Determina el estado compatible con los filtros y badges
+const mapStatus = (state, startTime, endTime) => {
+  const now = Date.now();
+  const start = new Date(startTime).getTime();
+  const end = new Date(endTime).getTime();
+
+  if (state === 2 || state === 3 || (endTime && end <= now)) {
+    return 'ENDED';
+  }
+  if (state === 0 || (startTime && start > now)) {
+    return 'UPCOMING';
+  }
+  return 'ACTIVE';
+};
+
+const adaptBackendAuction = (item) => {
+  const category = item.category || mapCategory(item.title, item.description);
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    category,
+    startingPrice: item.startingPrice,
+    currentPrice: item.currentPrice || item.startingPrice,
+    bidCount: item.bidCount ?? (item.bids ? item.bids.length : 0),
+    status: item.status || mapStatus(item.state, item.startTime, item.endTime),
+    imageUrl: item.imageUrl || mapImage(item.title, category),
+    startTime: item.startTime,
+    endTime: item.endTime,
+    sellerId: item.sellerId,
+    sellerName: item.sellerName || 'Vendedor',
+    isRealApi: true,
+  };
+};
 
 export default function HomePage() {
+  const [auctions, setAuctions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('NEWEST');
 
+  const loadAuctions = async () => {
+    setIsLoading(true);
+    setApiError(null);
+    try {
+      const data = await fetchWithAuth('/auctions');
+      const apiAuctions = Array.isArray(data) ? data.map(adaptBackendAuction) : [];
+
+      const combined = [...apiAuctions];
+      if (apiAuctions.length === 0) {
+        combined.push(...MOCK_AUCTIONS);
+      } else {
+        // Complementar con las subastas mock para tener variedad de categorías y estados
+        const existingIds = new Set(apiAuctions.map((a) => String(a.id)));
+        const additionalMocks = MOCK_AUCTIONS.filter((m) => !existingIds.has(String(m.id)));
+        combined.push(...additionalMocks);
+      }
+
+      setAuctions(combined);
+    } catch (err) {
+      console.warn('Backend no disponible, usando subastas de demostración:', err);
+      setApiError('No se pudo conectar con el backend. Mostrando datos de demostración.');
+      setAuctions(MOCK_AUCTIONS);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAuctions();
+  }, []);
+
   // Filtrado y ordenamiento de subastas
   const filteredAuctions = useMemo(() => {
-    return MOCK_AUCTIONS.filter((item) => {
+    return auctions.filter((item) => {
       // Filtro por término de búsqueda
       const matchesSearch =
         searchTerm === '' ||
@@ -33,9 +154,9 @@ export default function HomePage() {
       if (sortBy === 'PRICE_DESC') return b.currentPrice - a.currentPrice;
       if (sortBy === 'MOST_BIDS') return b.bidCount - a.bidCount;
       // Default: NEWEST
-      return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+      return new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime();
     });
-  }, [searchTerm, selectedCategory, selectedStatus, sortBy]);
+  }, [auctions, searchTerm, selectedCategory, selectedStatus, sortBy]);
 
   const handleResetFilters = () => {
     setSearchTerm('');
@@ -44,7 +165,7 @@ export default function HomePage() {
     setSortBy('NEWEST');
   };
 
-  const activeCount = MOCK_AUCTIONS.filter((a) => a.status === 'ACTIVE').length;
+  const activeCount = auctions.filter((a) => a.status === 'ACTIVE').length;
 
   return (
     <div className="space-y-8">
@@ -81,6 +202,19 @@ export default function HomePage() {
         <Gavel className="absolute -right-8 -bottom-8 w-64 h-64 text-amber-500/5 rotate-12 pointer-events-none" />
       </div>
 
+      {/* Aviso si la API está desconectada */}
+      {apiError && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm flex items-center justify-between">
+          <span>{apiError}</span>
+          <button
+            onClick={loadAuctions}
+            className="text-xs underline hover:text-white font-medium ml-4"
+          >
+            Reintentar conexión
+          </button>
+        </div>
+      )}
+
       {/* Filtros */}
       <AuctionFilter
         searchTerm={searchTerm}
@@ -93,11 +227,21 @@ export default function HomePage() {
         setSortBy={setSortBy}
       />
 
-      {/* Contador de resultados */}
+      {/* Contador de resultados y refresco */}
       <div className="flex items-center justify-between text-sm text-slate-400 px-1">
-        <span>
-          Mostrando <strong className="text-white">{filteredAuctions.length}</strong> subastas
-        </span>
+        <div className="flex items-center gap-2">
+          <span>
+            Mostrando <strong className="text-white">{filteredAuctions.length}</strong> subastas
+          </span>
+          <button
+            onClick={loadAuctions}
+            disabled={isLoading}
+            title="Actualizar subastas"
+            className="p-1 hover:text-amber-400 text-slate-400 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-amber-500' : ''}`} />
+          </button>
+        </div>
         {(searchTerm || selectedCategory !== 'Todas' || selectedStatus !== 'ALL') && (
           <button
             onClick={handleResetFilters}
@@ -108,11 +252,18 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* Grilla de Subastas */}
-      <AuctionGrid
-        auctions={filteredAuctions}
-        onResetFilters={handleResetFilters}
-      />
+      {/* Grilla o Spinner */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 space-y-3">
+          <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+          <span className="text-slate-400 text-sm">Cargando subastas...</span>
+        </div>
+      ) : (
+        <AuctionGrid
+          auctions={filteredAuctions}
+          onResetFilters={handleResetFilters}
+        />
+      )}
     </div>
   );
 }
