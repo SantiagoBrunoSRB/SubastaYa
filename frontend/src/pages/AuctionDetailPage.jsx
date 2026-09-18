@@ -4,7 +4,6 @@ import { Gavel, Loader2, Tag, User as UserIcon } from 'lucide-react';
 import { fetchWithAuth } from '../services/api';
 import { signalRService } from '../services/signalrService';
 import { MOCK_AUCTIONS } from '../services/mockData';
-import { getCustomAuctions, saveCustomAuction } from '../services/auctionStorage';
 import AuctionTimer from '../components/auctions/AuctionTimer';
 import BidConsole from '../components/auctions/BidConsole';
 
@@ -31,8 +30,26 @@ export default function AuctionDetailPage() {
 
   useEffect(() => {
     const loadAuction = async () => {
-      // 1. Buscar en subastas guardadas en localStorage (creadas localmente o con ID real del backend)
-      //    Esto cubre tanto IDs tipo 'auc_XXX' como IDs numéricos del backend que se guardaron localmente
+      const isNumericId = !isNaN(Number(id)) && id !== '' && !id.includes('_');
+
+      // 1. Para IDs numéricos, la API del backend es la fuente de verdad.
+      //    Así el historial de pujas y el saldo retenido siempre reflejan el estado real.
+      if (isNumericId) {
+        try {
+          const data = await fetchWithAuth(`/auctions/${id}`);
+          setAuction(data);
+          setCurrentPrice(data.currentPrice);
+          setBids(data.bids || []);
+          setError(null);
+        } catch (err) {
+          setError(err.message || 'Error al cargar la subasta.');
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // 2. Para IDs no-numéricos (subastas locales / mock): buscar en localStorage
       const customAuctions = getCustomAuctions();
       const custom = customAuctions.find((a) => String(a.id) === String(id));
       if (custom) {
@@ -49,7 +66,7 @@ export default function AuctionDetailPage() {
         return;
       }
 
-      // 2. Buscar en mocks (IDs tipo 'auc_101')
+      // 3. Buscar en mocks estáticos (IDs tipo 'auc_101')
       const mock = MOCK_AUCTIONS.find((a) => String(a.id) === String(id));
       if (mock) {
         setAuction({
@@ -65,26 +82,9 @@ export default function AuctionDetailPage() {
         return;
       }
 
-      // 3. Solo consultar la API si el ID es numérico puro (IDs del backend)
-      const isNumericId = !isNaN(Number(id)) && id !== '' && !id.includes('_');
-      if (!isNumericId) {
-        setError('Subasta no encontrada. Es posible que haya expirado o no exista.');
-        setIsLoading(false);
-        return;
-      }
-
-      // 4. ID numérico puro: consultar a la API REST del backend
-      try {
-        const data = await fetchWithAuth(`/auctions/${id}`);
-        setAuction(data);
-        setCurrentPrice(data.currentPrice);
-        setBids(data.bids || []);
-        setError(null);
-      } catch (err) {
-        setError(err.message || 'Error al cargar la subasta.');
-      } finally {
-        setIsLoading(false);
-      }
+      // ID no numérico no encontrado en ninguna fuente
+      setError('Subasta no encontrada. Es posible que haya expirado o no exista.');
+      setIsLoading(false);
     };
 
     loadAuction();
@@ -126,16 +126,8 @@ export default function AuctionDetailPage() {
       timestamp: new Date().toISOString()
     };
     setBids((prev) => [newBid, ...prev]);
-
-    // Si es subasta personalizada de localStorage, persistir la oferta
-    const customList = getCustomAuctions();
-    const target = customList.find((a) => String(a.id) === String(id));
-    if (target) {
-      target.currentPrice = newAmount;
-      target.bidCount = (target.bidCount || 0) + 1;
-      target.bids = [newBid, ...(target.bids || [])];
-      saveCustomAuction(target);
-    }
+    // Para subastas reales (ID numérico), SignalR ya envía el bid a todos los clientes.
+    // Para mocks, solo actualizamos el estado en memoria (sin persistir).
   };
 
   if (isLoading) {
