@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Tag, Eye, ArrowUpRight } from 'lucide-react';
 
@@ -23,38 +23,98 @@ export default function AuctionCard({ auction }) {
     }).format(amount);
   };
 
+  // Cálculo del tiempo restante en milisegundos
+  const calculateTimeLeft = () => {
+    if (!endTime) return null;
+    const end = new Date(endTime).getTime();
+    if (isNaN(end)) return null;
+    return Math.max(0, end - Date.now());
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+
+  useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
+
+    if (!endTime || status === 'ENDED') return;
+
+    const timer = setInterval(() => {
+      const remaining = calculateTimeLeft();
+      setTimeLeft(remaining);
+      if (remaining !== null && remaining <= 0) {
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [endTime, status]);
+
+  // Formateador de tiempo regresivo (Días, Horas, Minutos, Segundos)
+  const formatCountdown = (ms) => {
+    if (ms === null || ms === undefined || ms <= 0) return '00:00:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const seconds = totalSeconds % 60;
+    const minutes = Math.floor(totalSeconds / 60) % 60;
+    const hours = Math.floor(totalSeconds / 3600) % 24;
+    const days = Math.floor(totalSeconds / 86400);
+
+    const pad = (n) => n.toString().padStart(2, '0');
+
+    if (days > 0) {
+      return `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  };
+
+  const isAuctionEnded = status === 'ENDED' || (endTime && timeLeft !== null && timeLeft <= 0);
+
   // Badges según estado
   const getStatusBadge = () => {
+    if (isAuctionEnded) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-400 border border-slate-600">
+          Finalizada
+        </span>
+      );
+    }
     switch (status) {
-      case 'ACTIVE':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            En Vivo
-          </span>
-        );
       case 'UPCOMING':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">
             Próximamente
           </span>
         );
-      case 'ENDED':
+      case 'ACTIVE':
+      default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-400 border border-slate-600">
-            Finalizada
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            En Vivo
           </span>
         );
-      default:
-        return null;
     }
   };
 
-  // Cálculo básico de tiempo (estático para maquetado)
-  const getTimeLabel = () => {
-    if (status === 'ENDED') return 'Subasta cerrada';
-    if (status === 'UPCOMING') return 'Comienza pronto';
-    return 'Finaliza hoy';
+  // Renderizado del texto de tiempo / cuenta regresiva
+  const renderTimeInfo = () => {
+    if (isAuctionEnded) {
+      return <span className="text-slate-400 font-medium">Subasta cerrada</span>;
+    }
+    if (status === 'UPCOMING') {
+      return <span className="text-blue-300 font-medium">Comienza pronto</span>;
+    }
+    if (timeLeft !== null) {
+      const isCritical = timeLeft < 60000;
+      return (
+        <span className="flex items-center gap-1">
+          <span>Finaliza en:</span>
+          <span className={`font-mono font-bold tracking-tight ${isCritical ? 'text-red-400 animate-pulse' : 'text-amber-300'}`}>
+            {formatCountdown(timeLeft)}
+          </span>
+        </span>
+      );
+    }
+    return <span>Finaliza hoy</span>;
   };
 
   return (
@@ -79,12 +139,12 @@ export default function AuctionCard({ auction }) {
         </div>
 
         {/* Contador / Tiempo inferior */}
-        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-slate-300 bg-slate-900/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-800">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>{getTimeLabel()}</span>
+        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-slate-300 bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            {renderTimeInfo()}
           </div>
-          <span className="font-semibold text-white">{bidCount} pujas</span>
+          <span className="font-semibold text-white shrink-0 ml-2">{bidCount} pujas</span>
         </div>
       </div>
 
