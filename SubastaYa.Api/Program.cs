@@ -173,19 +173,6 @@ using (var scope = app.Services.CreateScope())
 app.MapControllers();
 app.MapHub<AuctionHub>("/auctionHub");
 
-// Seed Data
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        await DataSeeder.SeedAsync(services);
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ocurrió un error al sembrar la base de datos.");
-    }
-}
+
 
 app.Run();
