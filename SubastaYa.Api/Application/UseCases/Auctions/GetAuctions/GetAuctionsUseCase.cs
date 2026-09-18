@@ -12,9 +12,9 @@ public class GetAuctionsUseCase
         _auctionRepository = auctionRepository;
     }
 
-    public async Task<IEnumerable<AuctionResponseDto>> ExecuteAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<AuctionResponseDto>> ExecuteAsync(bool includeClosed = false, string? sellerId = null, CancellationToken cancellationToken = default)
     {
-        var auctions = await _auctionRepository.GetAllActiveAsync(cancellationToken);
+        var auctions = await _auctionRepository.GetAllAsync(includeClosed, sellerId, cancellationToken);
         
         return auctions.Select(a => new AuctionResponseDto
         {

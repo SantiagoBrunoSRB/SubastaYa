@@ -47,6 +47,32 @@ export async function fetchWithAuth(endpoint, options = {}) {
         throw new Error(errorMessage);
     }
 
+    // Si la respuesta fue 201 Created y tiene header Location, intentar extraer el id
+    if (response.status === 201) {
+        const location = response.headers.get('Location') || response.headers.get('location');
+        let extractedId = null;
+        if (location) {
+            const match = location.match(/[/?&]id=(\d+)/i) || location.match(/\/auctions\/(\d+)/i);
+            if (match) {
+                extractedId = parseInt(match[1], 10);
+            }
+        }
+
+        const text = await response.text();
+        if (text && text.trim()) {
+            try {
+                const parsed = JSON.parse(text);
+                if (extractedId && !parsed.id) {
+                    parsed.id = extractedId;
+                }
+                return parsed;
+            } catch {
+                return extractedId ? { id: extractedId } : text;
+            }
+        }
+        return extractedId ? { id: extractedId } : null;
+    }
+
     // Handle 204 No Content o respuestas con cuerpo vacío
     if (response.status === 204 || response.headers.get('content-length') === '0') {
         return null;

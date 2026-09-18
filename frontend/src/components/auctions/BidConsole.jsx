@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, AlertTriangle, ShieldCheck, DollarSign } from 'lucide-react';
+import { TrendingUp, AlertTriangle, ShieldCheck, DollarSign, Clock } from 'lucide-react';
 import { useWallet } from '../../contexts/WalletContext';
 import { fetchWithAuth } from '../../services/api';
 
-export default function BidConsole({ auctionId, currentPrice, minimumIncrement, isLeading, isClosed, onBidSuccess }) {
+export default function BidConsole({ 
+  auctionId, 
+  currentPrice, 
+  minimumIncrement, 
+  isLeading, 
+  isClosed, 
+  isUpcoming, 
+  startTime, 
+  onBidSuccess 
+}) {
   const { balance, fetchBalance } = useWallet();
   const [bidAmount, setBidAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,6 +32,11 @@ export default function BidConsole({ auctionId, currentPrice, minimumIncrement, 
     setError(null);
     setSuccessMsg(null);
 
+    if (isUpcoming) {
+      setError('La subasta aún no ha comenzado. Las ofertas se habilitarán al iniciar.');
+      return;
+    }
+
     const amount = parseFloat(bidAmount);
 
     if (isNaN(amount) || amount < suggestedBid) {
@@ -37,12 +51,15 @@ export default function BidConsole({ auctionId, currentPrice, minimumIncrement, 
 
     setIsSubmitting(true);
     try {
-      await fetchWithAuth(`/auctions/${auctionId}/bids`, {
-        method: 'POST',
-        body: JSON.stringify({ amount })
-      });
+      if (!isNaN(Number(auctionId))) {
+        await fetchWithAuth(`/auctions/${auctionId}/bids`, {
+          method: 'POST',
+          body: JSON.stringify({ amount })
+        });
+        await fetchBalance(); // Actualizar saldo local de la API
+      }
+
       setSuccessMsg('¡Oferta realizada con éxito!');
-      await fetchBalance(); // Refresh local balance
 
       // Notificar al componente padre para reflejar inmediatamente la puja en la UI
       if (onBidSuccess) {
@@ -65,6 +82,25 @@ export default function BidConsole({ auctionId, currentPrice, minimumIncrement, 
     return (
       <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 text-center text-slate-400">
         La subasta ha finalizado y ya no acepta pujas.
+      </div>
+    );
+  }
+
+  if (isUpcoming) {
+    return (
+      <div className="p-6 rounded-2xl bg-slate-900 border border-blue-500/30 text-center space-y-3 shadow-xl">
+        <div className="inline-flex p-3 rounded-full bg-blue-500/10 text-blue-400">
+          <Clock className="w-6 h-6 animate-pulse" />
+        </div>
+        <h3 className="text-lg font-bold text-white">Subasta No Iniciada</h3>
+        <p className="text-xs text-slate-300 max-w-xs mx-auto leading-relaxed">
+          Esta subasta aún no ha comenzado. La consola de pujas se habilitará automáticamente al momento del inicio.
+        </p>
+        <div className="pt-2">
+          <span className="inline-block px-3.5 py-1.5 rounded-xl bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/30">
+            Apertura: {startTime ? new Date(startTime).toLocaleString('es-AR') : 'Próximamente'}
+          </span>
+        </div>
       </div>
     );
   }

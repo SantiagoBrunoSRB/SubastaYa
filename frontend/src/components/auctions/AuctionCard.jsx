@@ -11,6 +11,7 @@ export default function AuctionCard({ auction }) {
     bidCount,
     status,
     imageUrl,
+    startTime,
     endTime,
   } = auction;
 
@@ -67,6 +68,8 @@ export default function AuctionCard({ auction }) {
   };
 
   const isAuctionEnded = status === 'ENDED' || (endTime && timeLeft !== null && timeLeft <= 0);
+  // Próxima: SOLO si la fecha de inicio es estrictamente futura (la fecha manda, no las pujas)
+  const isAuctionUpcoming = !isAuctionEnded && status === 'UPCOMING' && startTime && new Date(startTime).getTime() > Date.now();
 
   // Badges según estado
   const getStatusBadge = () => {
@@ -77,22 +80,19 @@ export default function AuctionCard({ auction }) {
         </span>
       );
     }
-    switch (status) {
-      case 'UPCOMING':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-            Próximamente
-          </span>
-        );
-      case 'ACTIVE':
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            En Vivo
-          </span>
-        );
+    if (isAuctionUpcoming) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+          Próximamente
+        </span>
+      );
     }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        En Vivo
+      </span>
+    );
   };
 
   // Renderizado del texto de tiempo / cuenta regresiva
@@ -100,7 +100,7 @@ export default function AuctionCard({ auction }) {
     if (isAuctionEnded) {
       return <span className="text-slate-400 font-medium">Subasta cerrada</span>;
     }
-    if (status === 'UPCOMING') {
+    if (isAuctionUpcoming) {
       return <span className="text-blue-300 font-medium">Comienza pronto</span>;
     }
     if (timeLeft !== null) {

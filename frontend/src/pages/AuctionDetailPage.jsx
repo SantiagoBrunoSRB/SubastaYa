@@ -4,6 +4,7 @@ import { Gavel, Loader2, Tag, User as UserIcon } from 'lucide-react';
 import { fetchWithAuth } from '../services/api';
 import { signalRService } from '../services/signalrService';
 import { MOCK_AUCTIONS } from '../services/mockData';
+import { getCustomAuctions, saveCustomAuction } from '../services/auctionStorage';
 import AuctionTimer from '../components/auctions/AuctionTimer';
 import BidConsole from '../components/auctions/BidConsole';
 
@@ -25,50 +26,62 @@ export default function AuctionDetailPage() {
   const [currentPrice, setCurrentPrice] = useState(0);
   const [bids, setBids] = useState([]);
 
-  // Check if current user is leading (pseudo check based on token claims or we can just say if last bid is ours. Since we don't parse JWT here, we'll assume we can't easily tell unless backend tells us. For simulation, we assume false or we need a way. Let's rely on the backend response or just keep it simple).
+  // Check if current user is leading
   const [isLeading, setIsLeading] = useState(false);
 
   useEffect(() => {
     const loadAuction = async () => {
-      // Si el id es alfanumérico (ej: auc_101) o no numérico, buscar directamente en mocks
-      const isMockId = isNaN(Number(id));
-      if (isMockId) {
-        const mock = MOCK_AUCTIONS.find((a) => String(a.id) === String(id));
-        if (mock) {
-          setAuction({
-            ...mock,
-            state: mock.status === 'ACTIVE' ? 1 : mock.status === 'UPCOMING' ? 0 : 2,
-            category: mock.category,
-            bids: mock.bids || [],
-          });
-          setCurrentPrice(mock.currentPrice);
-          setBids(mock.bids || []);
-          setIsLoading(false);
-          return;
-        }
+      // 1. Buscar en subastas guardadas en localStorage (creadas localmente o con ID real del backend)
+      //    Esto cubre tanto IDs tipo 'auc_XXX' como IDs numéricos del backend que se guardaron localmente
+      const customAuctions = getCustomAuctions();
+      const custom = customAuctions.find((a) => String(a.id) === String(id));
+      if (custom) {
+        setAuction({
+          ...custom,
+          state: custom.status === 'ACTIVE' ? 1 : custom.status === 'UPCOMING' ? 0 : 2,
+          category: custom.category || 'Electrónica',
+          bids: custom.bids || [],
+        });
+        setCurrentPrice(custom.currentPrice || custom.startingPrice);
+        setBids(custom.bids || []);
+        setIsLoading(false);
+        setError(null);
+        return;
       }
 
+      // 2. Buscar en mocks (IDs tipo 'auc_101')
+      const mock = MOCK_AUCTIONS.find((a) => String(a.id) === String(id));
+      if (mock) {
+        setAuction({
+          ...mock,
+          state: mock.status === 'ACTIVE' ? 1 : mock.status === 'UPCOMING' ? 0 : 2,
+          category: mock.category,
+          bids: mock.bids || [],
+        });
+        setCurrentPrice(mock.currentPrice);
+        setBids(mock.bids || []);
+        setIsLoading(false);
+        setError(null);
+        return;
+      }
+
+      // 3. Solo consultar la API si el ID es numérico puro (IDs del backend)
+      const isNumericId = !isNaN(Number(id)) && id !== '' && !id.includes('_');
+      if (!isNumericId) {
+        setError('Subasta no encontrada. Es posible que haya expirado o no exista.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 4. ID numérico puro: consultar a la API REST del backend
       try {
         const data = await fetchWithAuth(`/auctions/${id}`);
         setAuction(data);
         setCurrentPrice(data.currentPrice);
         setBids(data.bids || []);
+        setError(null);
       } catch (err) {
-        // Fallback por si la API falla pero existe en mocks
-        const mock = MOCK_AUCTIONS.find((a) => String(a.id) === String(id));
-        if (mock) {
-          setAuction({
-            ...mock,
-            state: mock.status === 'ACTIVE' ? 1 : mock.status === 'UPCOMING' ? 0 : 2,
-            category: mock.category,
-            bids: mock.bids || [],
-          });
-          setCurrentPrice(mock.currentPrice);
-          setBids(mock.bids || []);
-          setError(null);
-        } else {
-          setError(err.message || 'Error al cargar la subasta.');
-        }
+        setError(err.message || 'Error al cargar la subasta.');
       } finally {
         setIsLoading(false);
       }
@@ -80,21 +93,24 @@ export default function AuctionDetailPage() {
   useEffect(() => {
     if (!id) return;
 
-    // Conectar SignalR
-    signalRService.startConnection(id);
+    // Solo conectar grupo en SignalR si el ID es válido numéricamente en el backend
+    if (!isNaN(Number(id))) {
+      signalRService.startConnection(id);
+    }
 
     // Escuchar pujas nuevas
     const handleReceiveBid = (bidData) => {
       setBids(prev => [bidData, ...prev]);
       setCurrentPrice(bidData.amount);
-      // We could check if bidData.bidderId == currentUser to set isLeading
     };
 
     signalRService.onReceiveBid(handleReceiveBid);
 
     return () => {
       signalRService.offReceiveBid(handleReceiveBid);
-      signalRService.stopConnection(id);
+      if (!isNaN(Number(id))) {
+        signalRService.stopConnection(id);
+      }
     };
   }, [id]);
 
@@ -110,6 +126,16 @@ export default function AuctionDetailPage() {
       timestamp: new Date().toISOString()
     };
     setBids((prev) => [newBid, ...prev]);
+
+    // Si es subasta personalizada de localStorage, persistir la oferta
+    const customList = getCustomAuctions();
+    const target = customList.find((a) => String(a.id) === String(id));
+    if (target) {
+      target.currentPrice = newAmount;
+      target.bidCount = (target.bidCount || 0) + 1;
+      target.bids = [newBid, ...(target.bids || [])];
+      saveCustomAuction(target);
+    }
   };
 
   if (isLoading) {
@@ -128,7 +154,14 @@ export default function AuctionDetailPage() {
     );
   }
 
-  const isClosed = auction.state === 2 || auction.state === 3 || new Date(auction.endTime).getTime() <= new Date().getTime();
+  const nowMs = Date.now();
+  const startMs = auction.startTime ? new Date(auction.startTime).getTime() : null;
+  const endMs = auction.endTime ? new Date(auction.endTime).getTime() : null;
+  const bidsCount = Number(auction.bidCount) || (bids ? bids.length : 0);
+
+  const isClosed = auction.state === 2 || auction.state === 3 || (endMs && endMs <= nowMs);
+  // Próxima: solo si la fecha de inicio es estrictamente futura (la fecha manda, no las pujas)
+  const isUpcoming = !isClosed && startMs && startMs > nowMs;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -144,10 +177,10 @@ export default function AuctionDetailPage() {
           <h1 className="text-3xl font-extrabold text-white">{auction.title}</h1>
         </div>
         <div className="flex flex-col items-start md:items-end bg-slate-900 px-6 py-3 rounded-xl border border-slate-800">
-          <span className="text-sm text-slate-400 font-medium">Tiempo Restante</span>
           <AuctionTimer 
+            initialStartTime={auction.startTime}
             initialEndTime={auction.endTime} 
-            onTimeEnd={() => {/* Optional: trigger reload or local state change */}} 
+            onTimeEnd={() => {/* Fin de subasta */}} 
           />
         </div>
       </div>
@@ -182,9 +215,11 @@ export default function AuctionDetailPage() {
           <BidConsole 
             auctionId={id}
             currentPrice={currentPrice}
-            minimumIncrement={100} // Valor estático por ahora
+            minimumIncrement={100}
             isLeading={isLeading}
             isClosed={isClosed}
+            isUpcoming={isUpcoming}
+            startTime={auction.startTime}
             onBidSuccess={handleLocalBidSuccess}
           />
 

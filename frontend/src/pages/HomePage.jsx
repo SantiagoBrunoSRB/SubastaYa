@@ -4,6 +4,7 @@ import AuctionFilter from '../components/auctions/AuctionFilter';
 import AuctionGrid from '../components/auctions/AuctionGrid';
 import { MOCK_AUCTIONS } from '../services/mockData';
 import { fetchWithAuth } from '../services/api';
+import { getCustomAuctions } from '../services/auctionStorage';
 
 // Detecta categoría automáticamente según título/descripción si el backend no la provee
 const mapCategory = (title = '', description = '') => {
@@ -56,18 +57,28 @@ const mapImage = (title = '', category = '') => {
   return 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80';
 };
 
-// Determina el estado compatible con los filtros y badges
-const mapStatus = (state, startTime, endTime) => {
+// Determina el estado dinámicamente y en tiempo real según fecha de finalización, inicio o estado backend
+export const getEffectiveStatus = (item) => {
   const now = Date.now();
-  const start = new Date(startTime).getTime();
-  const end = new Date(endTime).getTime();
+  const start = item.startTime ? new Date(item.startTime).getTime() : null;
+  const end = item.endTime ? new Date(item.endTime).getTime() : null;
 
-  if (state === 2 || state === 3 || (endTime && end <= now)) {
+  // 1. Finalizada: por estado en backend (2 o 3) o si expiró la fecha de fin
+  //    SOLO marcar como ENDED si el end time ya pasó. El backend state=2/3 también aplica.
+  if (item.state === 2 || item.state === 3 || item.status === 'ENDED') {
     return 'ENDED';
   }
-  if (state === 0 || (startTime && start > now)) {
+  // Si la fecha de fin ya pasó, es ENDED (independiente de pujas)
+  if (end && end <= now) {
+    return 'ENDED';
+  }
+
+  // 2. Próxima: SOLO si la fecha de inicio es estrictamente futura (la fecha manda, no las pujas)
+  if (start && start > now) {
     return 'UPCOMING';
   }
+
+  // 3. Activa: la fecha de inicio ya pasó (o no tiene fecha de inicio definida)
   return 'ACTIVE';
 };
 
@@ -81,7 +92,8 @@ const adaptBackendAuction = (item) => {
     startingPrice: item.startingPrice,
     currentPrice: item.currentPrice || item.startingPrice,
     bidCount: item.bidCount ?? (item.bids ? item.bids.length : 0),
-    status: item.status || mapStatus(item.state, item.startTime, item.endTime),
+    status: getEffectiveStatus(item),
+    state: item.state,
     imageUrl: item.imageUrl || mapImage(item.title, category),
     startTime: item.startTime,
     endTime: item.endTime,
@@ -104,24 +116,44 @@ export default function HomePage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const data = await fetchWithAuth('/auctions');
+      // Solicitar todas las subastas incluyendo las finalizadas
+      const data = await fetchWithAuth('/auctions?includeClosed=true');
       const apiAuctions = Array.isArray(data) ? data.map(adaptBackendAuction) : [];
+      const customAuctions = getCustomAuctions();
 
       const combined = [...apiAuctions];
-      if (apiAuctions.length === 0) {
-        combined.push(...MOCK_AUCTIONS);
-      } else {
-        // Complementar con las subastas mock para tener variedad de categorías y estados
-        const existingIds = new Set(apiAuctions.map((a) => String(a.id)));
-        const additionalMocks = MOCK_AUCTIONS.filter((m) => !existingIds.has(String(m.id)));
-        combined.push(...additionalMocks);
+      const existingIds = new Set(apiAuctions.map((a) => String(a.id)));
+
+      // Integrar subastas creadas localmente para garantizar que no se pierdan
+      // Si el ID del localStorage ya existe en la API, la API es la fuente de verdad (más actualizada)
+      for (const custom of customAuctions) {
+        if (!existingIds.has(String(custom.id))) {
+          combined.push(custom);
+          existingIds.add(String(custom.id));
+        }
+      }
+
+      // Complementar con subastas mock para tener variedad de datos
+      for (const mock of MOCK_AUCTIONS) {
+        if (!existingIds.has(String(mock.id))) {
+          combined.push(mock);
+          existingIds.add(String(mock.id));
+        }
       }
 
       setAuctions(combined);
     } catch (err) {
-      console.warn('Backend no disponible, usando subastas de demostración:', err);
-      setApiError('No se pudo conectar con el backend. Mostrando datos de demostración.');
-      setAuctions(MOCK_AUCTIONS);
+      console.warn('Backend no disponible, usando subastas de demostración y locales:', err);
+      setApiError('No se pudo conectar con el backend. Mostrando subastas guardadas y de demostración.');
+      const customAuctions = getCustomAuctions();
+      const existingIds = new Set(customAuctions.map((a) => String(a.id)));
+      const combined = [...customAuctions];
+      for (const mock of MOCK_AUCTIONS) {
+        if (!existingIds.has(String(mock.id))) {
+          combined.push(mock);
+        }
+      }
+      setAuctions(combined);
     } finally {
       setIsLoading(false);
     }
@@ -131,31 +163,37 @@ export default function HomePage() {
     loadAuctions();
   }, []);
 
-  // Filtrado y ordenamiento de subastas
+  // Filtrado y ordenamiento dinámico de subastas
   const filteredAuctions = useMemo(() => {
-    return auctions.filter((item) => {
-      // Filtro por término de búsqueda
-      const matchesSearch =
-        searchTerm === '' ||
-        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return auctions
+      .map((item) => ({
+        ...item,
+        status: getEffectiveStatus(item),
+      }))
+      .filter((item) => {
+        // Filtro por término de búsqueda
+        const matchesSearch =
+          searchTerm === '' ||
+          item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.description.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Filtro por categoría
-      const matchesCategory =
-        selectedCategory === 'Todas' || item.category === selectedCategory;
+        // Filtro por categoría
+        const matchesCategory =
+          selectedCategory === 'Todas' || item.category === selectedCategory;
 
-      // Filtro por estado
-      const matchesStatus =
-        selectedStatus === 'ALL' || item.status === selectedStatus;
+        // Filtro por estado en tiempo real
+        const matchesStatus =
+          selectedStatus === 'ALL' || item.status === selectedStatus;
 
-      return matchesSearch && matchesCategory && matchesStatus;
-    }).sort((a, b) => {
-      if (sortBy === 'PRICE_ASC') return a.currentPrice - b.currentPrice;
-      if (sortBy === 'PRICE_DESC') return b.currentPrice - a.currentPrice;
-      if (sortBy === 'MOST_BIDS') return b.bidCount - a.bidCount;
-      // Default: NEWEST
-      return new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime();
-    });
+        return matchesSearch && matchesCategory && matchesStatus;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'PRICE_ASC') return a.currentPrice - b.currentPrice;
+        if (sortBy === 'PRICE_DESC') return b.currentPrice - a.currentPrice;
+        if (sortBy === 'MOST_BIDS') return b.bidCount - a.bidCount;
+        // Default: NEWEST
+        return new Date(b.startTime || 0).getTime() - new Date(a.startTime || 0).getTime();
+      });
   }, [auctions, searchTerm, selectedCategory, selectedStatus, sortBy]);
 
   const handleResetFilters = () => {
@@ -165,7 +203,7 @@ export default function HomePage() {
     setSortBy('NEWEST');
   };
 
-  const activeCount = auctions.filter((a) => a.status === 'ACTIVE').length;
+  const activeCount = auctions.filter((a) => getEffectiveStatus(a) === 'ACTIVE').length;
 
   return (
     <div className="space-y-8">

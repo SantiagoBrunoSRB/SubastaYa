@@ -39,9 +39,19 @@ public class AuctionsController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAuctions(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAuctions([FromQuery] bool includeClosed = false, [FromQuery] string? sellerId = null, CancellationToken cancellationToken = default)
     {
-        var auctions = await _getAuctionsUseCase.ExecuteAsync(cancellationToken);
+        var auctions = await _getAuctionsUseCase.ExecuteAsync(includeClosed, sellerId, cancellationToken);
+        return Ok(auctions);
+    }
+
+    [HttpGet("my-publications")]
+    public async Task<IActionResult> GetMyPublications(CancellationToken cancellationToken = default)
+    {
+        var sellerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(sellerId)) return Unauthorized();
+
+        var auctions = await _getAuctionsUseCase.ExecuteAsync(includeClosed: true, sellerId: sellerId, cancellationToken: cancellationToken);
         return Ok(auctions);
     }
 
@@ -63,7 +73,7 @@ public class AuctionsController : ControllerBase
 
         var id = await _createAuctionUseCase.ExecuteAsync(request, sellerId, cancellationToken);
         
-        return CreatedAtAction(nameof(GetAuctions), new { id }, null);
+        return CreatedAtAction(nameof(GetAuctions), new { id }, new { id });
     }
 
     [HttpPost("{id}/bids")]

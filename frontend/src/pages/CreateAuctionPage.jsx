@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { MOCK_CATEGORIES, MOCK_AUCTIONS } from '../services/mockData';
 import AuctionCard from '../components/auctions/AuctionCard';
+import { fetchWithAuth } from '../services/api';
+import { saveCustomAuction } from '../services/auctionStorage';
 
 export default function CreateAuctionPage() {
   const navigate = useNavigate();
@@ -89,36 +91,63 @@ export default function CreateAuctionPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setIsSubmitting(true);
 
-    // Simulación de envío a API REST
-    setTimeout(() => {
-      const newAuction = {
-        id: `auc_${Date.now()}`,
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        startingPrice: parseFloat(formData.startingPrice),
-        currentPrice: parseFloat(formData.startingPrice),
-        bidCount: 0,
-        status: 'ACTIVE',
-        imageUrl: previewImageUrl,
-        startTime: new Date(formData.startTime).toISOString(),
-        endTime: new Date(formData.endTime).toISOString(),
-        sellerId: 'usr_1',
-        sellerName: 'Santiago Bruno',
-      };
+    const token = localStorage.getItem('token');
+    const userEmail = localStorage.getItem('userEmail') || 'Santiago Bruno';
 
-      // Agregar temporalmente al mock local
-      MOCK_AUCTIONS.unshift(newAuction);
+    let createdBackendId = null;
 
-      setIsSubmitting(false);
-      setShowSuccessModal(true);
-    }, 1000);
+    // Intentar registrar en el backend si el usuario tiene sesión activa
+    if (token) {
+      try {
+        const response = await fetchWithAuth('/auctions', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: formData.title.trim(),
+            description: formData.description.trim(),
+            startingPrice: parseFloat(formData.startingPrice),
+            startTime: new Date(formData.startTime).toISOString(),
+            endTime: new Date(formData.endTime).toISOString(),
+          }),
+        });
+        if (response && response.id) {
+          createdBackendId = response.id;
+        }
+      } catch (err) {
+        console.warn('No se pudo persistir en la API, guardando en respaldo local:', err);
+      }
+    }
+
+    const isStartingLater = new Date(formData.startTime).getTime() > Date.now();
+
+    const newAuction = {
+      id: createdBackendId || `auc_${Date.now()}`,
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      category: formData.category,
+      startingPrice: parseFloat(formData.startingPrice),
+      currentPrice: parseFloat(formData.startingPrice),
+      bidCount: 0,
+      status: isStartingLater ? 'UPCOMING' : 'ACTIVE',
+      imageUrl: previewImageUrl,
+      startTime: new Date(formData.startTime).toISOString(),
+      endTime: new Date(formData.endTime).toISOString(),
+      sellerId: token ? (localStorage.getItem('userId') || 'usr_1') : 'usr_1',
+      sellerName: userEmail.includes('@') ? userEmail.split('@')[0] : userEmail,
+      isRealApi: !!createdBackendId,
+    };
+
+    // Guardar SIEMPRE en localStorage (con el ID del backend si existe)
+    // Esto garantiza que la subasta persista en Mis Publicaciones y en el Home
+    saveCustomAuction(newAuction);
+
+    setIsSubmitting(false);
+    setShowSuccessModal(true);
   };
 
   // Objeto preparado para la previsualización del AuctionCard
