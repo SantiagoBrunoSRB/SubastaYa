@@ -28,7 +28,10 @@ export async function fetchWithAuth(endpoint, options = {}) {
             errorData = { message: response.statusText };
         }
 
-        let errorMessage = errorData.message;
+        // 1. Extraer detalle de excepciones de negocio / dominio (ProblemDetails.Detail)
+        let errorMessage = errorData.detail || errorData.message;
+
+        // 2. Extraer errores de validación de modelo (ValidationProblemDetails.Errors)
         if (!errorMessage && errorData.errors && typeof errorData.errors === 'object') {
             const errorList = Object.values(errorData.errors).flat().filter(Boolean);
             if (errorList.length > 0) {
@@ -36,6 +39,7 @@ export async function fetchWithAuth(endpoint, options = {}) {
             }
         }
 
+        // 3. Fallback al Title o genérico
         if (!errorMessage) {
             errorMessage = errorData.title || 'Error en la petición a la API';
         }
@@ -43,10 +47,19 @@ export async function fetchWithAuth(endpoint, options = {}) {
         throw new Error(errorMessage);
     }
 
-    // Handle 204 No Content
-    if (response.status === 204) {
+    // Handle 204 No Content o respuestas con cuerpo vacío
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
         return null;
     }
 
-    return response.json();
+    const text = await response.text();
+    if (!text || !text.trim()) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return text;
+    }
 }

@@ -3,7 +3,7 @@ import { TrendingUp, AlertTriangle, ShieldCheck, DollarSign } from 'lucide-react
 import { useWallet } from '../../contexts/WalletContext';
 import { fetchWithAuth } from '../../services/api';
 
-export default function BidConsole({ auctionId, currentPrice, minimumIncrement, isLeading, isClosed }) {
+export default function BidConsole({ auctionId, currentPrice, minimumIncrement, isLeading, isClosed, onBidSuccess }) {
   const { balance, fetchBalance } = useWallet();
   const [bidAmount, setBidAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,6 +43,11 @@ export default function BidConsole({ auctionId, currentPrice, minimumIncrement, 
       });
       setSuccessMsg('¡Oferta realizada con éxito!');
       await fetchBalance(); // Refresh local balance
+
+      // Notificar al componente padre para reflejar inmediatamente la puja en la UI
+      if (onBidSuccess) {
+        onBidSuccess(amount);
+      }
     } catch (err) {
       setError(err.message || 'Error al procesar la puja.');
     } finally {

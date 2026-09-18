@@ -98,6 +98,20 @@ export default function AuctionDetailPage() {
     };
   }, [id]);
 
+  const handleLocalBidSuccess = (newAmount) => {
+    setCurrentPrice(newAmount);
+    setIsLeading(true);
+
+    const currentUserEmail = localStorage.getItem('userEmail') || 'Tú';
+    const newBid = {
+      id: Date.now(),
+      amount: newAmount,
+      bidderId: currentUserEmail,
+      timestamp: new Date().toISOString()
+    };
+    setBids((prev) => [newBid, ...prev]);
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-20">
@@ -171,6 +185,7 @@ export default function AuctionDetailPage() {
             minimumIncrement={100} // Valor estático por ahora
             isLeading={isLeading}
             isClosed={isClosed}
+            onBidSuccess={handleLocalBidSuccess}
           />
 
           {/* Historial de Pujas */}
