@@ -26,7 +26,8 @@ public class GetAuctionsUseCase
             SellerId = a.SellerId,
             StartTime = a.StartTime,
             EndTime = a.EndTime,
-            State = a.State
+            State = a.State,
+            ImageUrl = a.ImageUrl
         });
     }
 }
