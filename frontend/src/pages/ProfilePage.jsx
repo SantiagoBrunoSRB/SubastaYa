@@ -12,12 +12,15 @@ import {
   Gavel,
   Tag,
   CheckCircle2,
+  LogIn,
 } from 'lucide-react';
 import { MOCK_USER, MOCK_AUCTIONS } from '../services/mockData';
 import { fetchWithAuth } from '../services/api';
 import { getEffectiveStatus } from './HomePage';
+import { useWallet } from '../contexts/WalletContext';
 
 export default function ProfilePage() {
+  const { isAuthenticated, login, isLoading } = useWallet();
   const [activeTab, setActiveTab] = useState('purchases'); // 'purchases' | 'publications'
   const [myPublications, setMyPublications] = useState([]);
   const [myPurchases, setMyPurchases] = useState([]);
@@ -59,6 +62,51 @@ export default function ProfilePage() {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  // --- Login Gate ---
+  if (!isAuthenticated) {
+    const demoUsers = [
+      { email: 'comprador1@test.com', label: 'Comprador 1', desc: '$150.000 · Lidera puja activa', colorClass: 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30' },
+      { email: 'comprador2@test.com', label: 'Comprador 2', desc: '$200.000 · Fondos libres',      colorClass: 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700' },
+      { email: 'vendedor@test.com',   label: 'Vendedor',    desc: 'Sin saldo · Solo publica',      colorClass: 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30' },
+      { email: 'sinfondos@test.com',  label: 'Sin Fondos',  desc: '$500 · No puede pujar alto',    colorClass: 'bg-red-500/15 hover:bg-red-500/25 text-red-300 border-red-500/30' },
+    ];
+
+    return (
+      <div className="max-w-md mx-auto mt-16 flex flex-col items-center gap-8">
+        {/* Icono */}
+        <div className="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-xl">
+          <LogIn className="w-10 h-10 text-amber-500" />
+        </div>
+
+        {/* Texto */}
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl font-black text-white">Iniciá sesión para ver tu perfil</h1>
+          <p className="text-slate-400 text-sm">
+            Seleccioná uno de los usuarios de demo para explorar la plataforma.
+          </p>
+        </div>
+
+        {/* Botones de demo */}
+        <div className="w-full space-y-3">
+          {demoUsers.map((u) => (
+            <button
+              key={u.email}
+              onClick={() => login(u.email, 'Password123!')}
+              disabled={isLoading}
+              className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border font-semibold transition-all disabled:opacity-50 ${u.colorClass}`}
+            >
+              <div className="text-left">
+                <span className="block text-sm font-bold">{u.label}</span>
+                <span className="block text-xs opacity-70 font-normal mt-0.5">{u.desc}</span>
+              </div>
+              <LogIn className="w-4 h-4 shrink-0 opacity-60" />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
