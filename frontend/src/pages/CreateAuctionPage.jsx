@@ -12,10 +12,9 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
-import { MOCK_CATEGORIES, MOCK_AUCTIONS } from '../services/mockData';
+import { MOCK_CATEGORIES } from '../services/mockData';
 import AuctionCard from '../components/auctions/AuctionCard';
 import { fetchWithAuth } from '../services/api';
-import { saveCustomAuction } from '../services/auctionStorage';
 
 export default function CreateAuctionPage() {
   const navigate = useNavigate();
@@ -42,6 +41,7 @@ export default function CreateAuctionPage() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdAuctionId, setCreatedAuctionId] = useState(null);
 
   const categoriesOptions = MOCK_CATEGORIES.filter((c) => c !== 'Todas');
 
@@ -95,59 +95,31 @@ export default function CreateAuctionPage() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    setIsSubmitting(true);
-
     const token = localStorage.getItem('token');
-    const userEmail = localStorage.getItem('userEmail') || 'Santiago Bruno';
-
-    let createdBackendId = null;
-
-    // Intentar registrar en el backend si el usuario tiene sesión activa
-    if (token) {
-      try {
-        const response = await fetchWithAuth('/auctions', {
-          method: 'POST',
-          body: JSON.stringify({
-            title: formData.title.trim(),
-            description: formData.description.trim(),
-            startingPrice: parseFloat(formData.startingPrice),
-            startTime: new Date(formData.startTime).toISOString(),
-            endTime: new Date(formData.endTime).toISOString(),
-          }),
-        });
-        if (response && response.id) {
-          createdBackendId = response.id;
-        }
-      } catch (err) {
-        console.warn('No se pudo persistir en la API, guardando en respaldo local:', err);
-      }
+    if (!token) {
+      setErrors({ submit: 'Debes iniciar sesión para publicar una subasta.' });
+      return;
     }
 
-    const isStartingLater = new Date(formData.startTime).getTime() > Date.now();
-
-    const newAuction = {
-      id: createdBackendId || `auc_${Date.now()}`,
-      title: formData.title.trim(),
-      description: formData.description.trim(),
-      category: formData.category,
-      startingPrice: parseFloat(formData.startingPrice),
-      currentPrice: parseFloat(formData.startingPrice),
-      bidCount: 0,
-      status: isStartingLater ? 'UPCOMING' : 'ACTIVE',
-      imageUrl: previewImageUrl,
-      startTime: new Date(formData.startTime).toISOString(),
-      endTime: new Date(formData.endTime).toISOString(),
-      sellerId: token ? (localStorage.getItem('userId') || 'usr_1') : 'usr_1',
-      sellerName: userEmail.includes('@') ? userEmail.split('@')[0] : userEmail,
-      isRealApi: !!createdBackendId,
-    };
-
-    // Guardar SIEMPRE en localStorage (con el ID del backend si existe)
-    // Esto garantiza que la subasta persista en Mis Publicaciones y en el Home
-    saveCustomAuction(newAuction);
-
-    setIsSubmitting(false);
-    setShowSuccessModal(true);
+    setIsSubmitting(true);
+    try {
+      const response = await fetchWithAuth('/auctions', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          startingPrice: parseFloat(formData.startingPrice),
+          startTime: new Date(formData.startTime).toISOString(),
+          endTime: new Date(formData.endTime).toISOString(),
+        }),
+      });
+      setCreatedAuctionId(response.id);
+      setShowSuccessModal(true);
+    } catch (err) {
+      setErrors({ submit: err.message || 'Error al publicar la subasta. Intentá nuevamente.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Objeto preparado para la previsualización del AuctionCard
@@ -391,6 +363,14 @@ export default function CreateAuctionPage() {
         </div>
       </div>
 
+      {/* Error de submit */}
+      {errors.submit && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {errors.submit}
+        </div>
+      )}
+
       {/* Modal de Éxito */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
@@ -407,9 +387,17 @@ export default function CreateAuctionPage() {
             </div>
 
             <div className="pt-2 flex flex-col gap-2">
+              {createdAuctionId && (
+                <button
+                  onClick={() => navigate(`/auctions/${createdAuctionId}`)}
+                  className="w-full py-3 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer"
+                >
+                  Ver mi Subasta
+                </button>
+              )}
               <button
                 onClick={() => navigate('/')}
-                className="w-full py-3 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer"
+                className="w-full py-3 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-700 text-white transition-colors cursor-pointer"
               >
                 Ir al Catálogo de Subastas
               </button>

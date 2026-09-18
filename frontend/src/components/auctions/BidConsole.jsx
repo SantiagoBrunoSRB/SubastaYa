@@ -13,7 +13,7 @@ export default function BidConsole({
   startTime, 
   onBidSuccess 
 }) {
-  const { balance, fetchBalance } = useWallet();
+  const { balance, fetchBalance, applyOptimisticHold } = useWallet();
   const [bidAmount, setBidAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -50,13 +50,21 @@ export default function BidConsole({
     }
 
     setIsSubmitting(true);
+    const isRealAuction = !isNaN(Number(auctionId));
+    // Solo aplicar hold optimista para subastas reales del backend.
+    // Las subastas mock/localStorage no tienen hold real en el servidor,
+    // así que el saldo no debe cambiar.
+    if (isRealAuction) {
+      applyOptimisticHold(amount);
+    }
     try {
-      if (!isNaN(Number(auctionId))) {
+      if (isRealAuction) {
         await fetchWithAuth(`/auctions/${auctionId}/bids`, {
           method: 'POST',
           body: JSON.stringify({ amount })
         });
-        await fetchBalance(); // Actualizar saldo local de la API
+        // Sincronizar con el saldo real del servidor (confirma el hold)
+        await fetchBalance();
       }
 
       setSuccessMsg('¡Oferta realizada con éxito!');
@@ -66,6 +74,10 @@ export default function BidConsole({
         onBidSuccess(amount);
       }
     } catch (err) {
+      // Revertir el hold optimista si el servidor rechazó la puja
+      if (isRealAuction) {
+        applyOptimisticHold(-amount);
+      }
       setError(err.message || 'Error al procesar la puja.');
     } finally {
       setIsSubmitting(false);

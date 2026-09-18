@@ -4,7 +4,6 @@ import AuctionFilter from '../components/auctions/AuctionFilter';
 import AuctionGrid from '../components/auctions/AuctionGrid';
 import { MOCK_AUCTIONS } from '../services/mockData';
 import { fetchWithAuth } from '../services/api';
-import { getCustomAuctions } from '../services/auctionStorage';
 
 // Detecta categoría automáticamente según título/descripción si el backend no la provee
 const mapCategory = (title = '', description = '') => {
@@ -119,41 +118,12 @@ export default function HomePage() {
       // Solicitar todas las subastas incluyendo las finalizadas
       const data = await fetchWithAuth('/auctions?includeClosed=true');
       const apiAuctions = Array.isArray(data) ? data.map(adaptBackendAuction) : [];
-      const customAuctions = getCustomAuctions();
-
-      const combined = [...apiAuctions];
-      const existingIds = new Set(apiAuctions.map((a) => String(a.id)));
-
-      // Integrar subastas creadas localmente para garantizar que no se pierdan
-      // Si el ID del localStorage ya existe en la API, la API es la fuente de verdad (más actualizada)
-      for (const custom of customAuctions) {
-        if (!existingIds.has(String(custom.id))) {
-          combined.push(custom);
-          existingIds.add(String(custom.id));
-        }
-      }
-
-      // Complementar con subastas mock para tener variedad de datos
-      for (const mock of MOCK_AUCTIONS) {
-        if (!existingIds.has(String(mock.id))) {
-          combined.push(mock);
-          existingIds.add(String(mock.id));
-        }
-      }
-
-      setAuctions(combined);
+      setAuctions(apiAuctions);
     } catch (err) {
-      console.warn('Backend no disponible, usando subastas de demostración y locales:', err);
-      setApiError('No se pudo conectar con el backend. Mostrando subastas guardadas y de demostración.');
-      const customAuctions = getCustomAuctions();
-      const existingIds = new Set(customAuctions.map((a) => String(a.id)));
-      const combined = [...customAuctions];
-      for (const mock of MOCK_AUCTIONS) {
-        if (!existingIds.has(String(mock.id))) {
-          combined.push(mock);
-        }
-      }
-      setAuctions(combined);
+      console.warn('Backend no disponible, mostrando subastas de demostración:', err);
+      setApiError('No se pudo conectar con el backend. Mostrando subastas de demostración.');
+      // Fallback: mostrar mocks estáticos cuando el backend no está disponible
+      setAuctions(MOCK_AUCTIONS.map((m) => ({ ...m, status: getEffectiveStatus(m) })));
     } finally {
       setIsLoading(false);
     }

@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { MOCK_USER, MOCK_AUCTIONS } from '../services/mockData';
 import { fetchWithAuth } from '../services/api';
-import { getCustomAuctions } from '../services/auctionStorage';
 import { getEffectiveStatus } from './HomePage';
 
 export default function ProfilePage() {
@@ -31,52 +30,22 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfileData = async () => {
-      const customAuctions = getCustomAuctions();
-      let apiPubs = [];
-
       try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          // Intentar obtener publicaciones del vendedor autenticado
-          const data = await fetchWithAuth('/auctions?includeClosed=true');
-          if (Array.isArray(data)) {
-            const currentUserId = localStorage.getItem('userId');
-            apiPubs = data.filter((a) => a.sellerId === currentUserId || a.sellerId === 'usr_1');
-          }
-        }
+        // Publicaciones: el endpoint filtra automáticamente por el usuario del JWT
+        const data = await fetchWithAuth('/auctions/my-publications');
+        const pubs = Array.isArray(data)
+          ? data.map((a) => ({ ...a, status: getEffectiveStatus(a) }))
+          : [];
+        setMyPublications(pubs);
       } catch (err) {
         console.warn('No se pudieron consultar publicaciones del backend:', err);
+        setMyPublications([]);
       }
 
-      // Combinar publicaciones locales, API y mock de demostración
-      const mockPubs = MOCK_AUCTIONS.filter((item) => item.sellerId === MOCK_USER.id);
-      const allPubs = [...customAuctions, ...apiPubs, ...mockPubs];
-      const seenPubIds = new Set();
-      const uniquePubs = [];
-
-      for (const p of allPubs) {
-        const key = String(p.id);
-        if (!seenPubIds.has(key)) {
-          seenPubIds.add(key);
-          uniquePubs.push({
-            ...p,
-            status: getEffectiveStatus(p),
-          });
-        }
-      }
-
-      setMyPublications(uniquePubs);
-
-      // Compras y participaciones
-      const seenPurchaseIds = new Set(uniquePubs.map((p) => String(p.id)));
-      const purchases = MOCK_AUCTIONS
-        .filter((item) => !seenPurchaseIds.has(String(item.id)))
-        .map((item) => ({
-          ...item,
-          status: getEffectiveStatus(item),
-        }));
-
-      setMyPurchases(purchases);
+      // Compras / participaciones: datos de demo hasta que el backend tenga ese endpoint
+      setMyPurchases(
+        MOCK_AUCTIONS.map((item) => ({ ...item, status: getEffectiveStatus(item) }))
+      );
     };
 
     loadProfileData();

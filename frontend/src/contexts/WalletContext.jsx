@@ -72,6 +72,19 @@ export const WalletProvider = ({ children }) => {
         }
     };
 
+    /**
+     * Actualiza el saldo de forma optimista cuando el usuario hace una puja.
+     * Retiene `amount` del saldo disponible localmente, sin esperar la confirmación del servidor.
+     * Luego fetchBalance() sincroniza con el valor real.
+     */
+    const applyOptimisticHold = useCallback((amount) => {
+        setBalance((prev) => ({
+            ...prev,
+            retainedAmount: prev.retainedAmount + amount,
+            availableAmount: prev.availableAmount - amount,
+        }));
+    }, []);
+
     const login = async (email = 'comprador1@test.com', password = 'Password123!') => {
         setIsLoading(true);
         setError(null);
@@ -134,7 +147,8 @@ export const WalletProvider = ({ children }) => {
             login,
             logout,
             fetchBalance,
-            fetchTransactions
+            fetchTransactions,
+            applyOptimisticHold
         }}>
             {children}
         </WalletContext.Provider>
