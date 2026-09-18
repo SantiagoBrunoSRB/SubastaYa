@@ -27,7 +27,20 @@ export async function fetchWithAuth(endpoint, options = {}) {
         } catch {
             errorData = { message: response.statusText };
         }
-        throw new Error(errorData.message || errorData.title || 'Error en la petición a la API');
+
+        let errorMessage = errorData.message;
+        if (!errorMessage && errorData.errors && typeof errorData.errors === 'object') {
+            const errorList = Object.values(errorData.errors).flat().filter(Boolean);
+            if (errorList.length > 0) {
+                errorMessage = errorList.join(' ');
+            }
+        }
+
+        if (!errorMessage) {
+            errorMessage = errorData.title || 'Error en la petición a la API';
+        }
+
+        throw new Error(errorMessage);
     }
 
     // Handle 204 No Content
