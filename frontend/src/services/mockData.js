@@ -22,6 +22,9 @@ export const MOCK_USER = {
   },
 };
 
+const nowMs = Date.now();
+const hourMs = 3600000;
+
 export const MOCK_AUCTIONS = [
   {
     id: 'auc_101',
@@ -33,8 +36,8 @@ export const MOCK_AUCTIONS = [
     bidCount: 14,
     status: 'ACTIVE', // ACTIVE, UPCOMING, ENDED
     imageUrl: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?auto=format&fit=crop&w=800&q=80',
-    startTime: '2026-09-17T00:00:00Z',
-    endTime: '2026-09-17T20:00:00Z',
+    startTime: new Date(nowMs - hourMs * 10).toISOString(),
+    endTime: new Date(nowMs + hourMs * 4 + 1800000).toISOString(), // ~4h 30m restantes
     sellerId: 'usr_2',
     sellerName: 'Marcos Dev',
   },
@@ -48,8 +51,8 @@ export const MOCK_AUCTIONS = [
     bidCount: 22,
     status: 'ACTIVE',
     imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    startTime: '2026-09-16T12:00:00Z',
-    endTime: '2026-09-18T18:00:00Z',
+    startTime: new Date(nowMs - hourMs * 24).toISOString(),
+    endTime: new Date(nowMs + hourMs * 18).toISOString(), // ~18h restantes
     sellerId: 'usr_3',
     sellerName: 'TechStore AR',
   },
@@ -63,8 +66,8 @@ export const MOCK_AUCTIONS = [
     bidCount: 9,
     status: 'ACTIVE',
     imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80',
-    startTime: '2026-09-17T04:00:00Z',
-    endTime: '2026-09-17T22:30:00Z',
+    startTime: new Date(nowMs - hourMs * 6).toISOString(),
+    endTime: new Date(nowMs + hourMs * 1 + 900000).toISOString(), // ~1h 15m restantes
     sellerId: 'usr_1',
     sellerName: 'Santiago Bruno',
   },
@@ -78,8 +81,8 @@ export const MOCK_AUCTIONS = [
     bidCount: 0,
     status: 'UPCOMING',
     imageUrl: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80',
-    startTime: '2026-09-18T10:00:00Z',
-    endTime: '2026-09-20T18:00:00Z',
+    startTime: new Date(nowMs + hourMs * 12).toISOString(),
+    endTime: new Date(nowMs + hourMs * 48).toISOString(),
     sellerId: 'usr_4',
     sellerName: 'Lucas Bici',
   },
@@ -93,8 +96,8 @@ export const MOCK_AUCTIONS = [
     bidCount: 31,
     status: 'ENDED',
     imageUrl: 'https://images.unsplash.com/photo-1577223625816-7546f13df25d?auto=format&fit=crop&w=800&q=80',
-    startTime: '2026-09-14T10:00:00Z',
-    endTime: '2026-09-16T22:00:00Z',
+    startTime: new Date(nowMs - hourMs * 72).toISOString(),
+    endTime: new Date(nowMs - hourMs * 24).toISOString(),
     sellerId: 'usr_1',
     sellerName: 'Santiago Bruno',
   },

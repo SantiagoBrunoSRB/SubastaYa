@@ -28,6 +28,25 @@ public class AuctionRepository : IAuctionRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IEnumerable<Auction>> GetAllAsync(bool includeClosed = false, string? sellerId = null, CancellationToken cancellationToken = default)
+    {
+        var query = _context.Auctions
+            .Include(a => a.Bids)
+            .AsQueryable();
+
+        if (!includeClosed)
+        {
+            query = query.Where(a => a.State == Domain.Enums.AuctionState.Active);
+        }
+
+        if (!string.IsNullOrEmpty(sellerId))
+        {
+            query = query.Where(a => a.SellerId == sellerId);
+        }
+
+        return await query.OrderByDescending(a => a.Id).ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Auction auction, CancellationToken cancellationToken = default)
     {
         await _context.Auctions.AddAsync(auction, cancellationToken);

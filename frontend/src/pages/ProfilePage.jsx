@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   User,
@@ -14,21 +14,73 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { MOCK_USER, MOCK_AUCTIONS } from '../services/mockData';
+import { fetchWithAuth } from '../services/api';
+import { getCustomAuctions } from '../services/auctionStorage';
+import { getEffectiveStatus } from './HomePage';
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('purchases'); // 'purchases' | 'publications'
+  const [myPublications, setMyPublications] = useState([]);
+  const [myPurchases, setMyPurchases] = useState([]);
 
-  const user = MOCK_USER;
+  const user = {
+    ...MOCK_USER,
+    name: localStorage.getItem('userEmail') ? localStorage.getItem('userEmail').split('@')[0] : MOCK_USER.name,
+    email: localStorage.getItem('userEmail') || MOCK_USER.email,
+  };
 
-  // Subastas publicadas por el usuario actual (sellerId === user.id)
-  const myPublications = MOCK_AUCTIONS.filter(
-    (item) => item.sellerId === user.id
-  );
+  useEffect(() => {
+    const loadProfileData = async () => {
+      const customAuctions = getCustomAuctions();
+      let apiPubs = [];
 
-  // Subastas donde el usuario ha participado (simulado para el usuario actual)
-  const myPurchases = MOCK_AUCTIONS.filter(
-    (item) => item.sellerId !== user.id
-  );
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          // Intentar obtener publicaciones del vendedor autenticado
+          const data = await fetchWithAuth('/auctions?includeClosed=true');
+          if (Array.isArray(data)) {
+            const currentUserId = localStorage.getItem('userId');
+            apiPubs = data.filter((a) => a.sellerId === currentUserId || a.sellerId === 'usr_1');
+          }
+        }
+      } catch (err) {
+        console.warn('No se pudieron consultar publicaciones del backend:', err);
+      }
+
+      // Combinar publicaciones locales, API y mock de demostración
+      const mockPubs = MOCK_AUCTIONS.filter((item) => item.sellerId === MOCK_USER.id);
+      const allPubs = [...customAuctions, ...apiPubs, ...mockPubs];
+      const seenPubIds = new Set();
+      const uniquePubs = [];
+
+      for (const p of allPubs) {
+        const key = String(p.id);
+        if (!seenPubIds.has(key)) {
+          seenPubIds.add(key);
+          uniquePubs.push({
+            ...p,
+            status: getEffectiveStatus(p),
+          });
+        }
+      }
+
+      setMyPublications(uniquePubs);
+
+      // Compras y participaciones
+      const seenPurchaseIds = new Set(uniquePubs.map((p) => String(p.id)));
+      const purchases = MOCK_AUCTIONS
+        .filter((item) => !seenPurchaseIds.has(String(item.id)))
+        .map((item) => ({
+          ...item,
+          status: getEffectiveStatus(item),
+        }));
+
+      setMyPurchases(purchases);
+    };
+
+    loadProfileData();
+  }, []);
 
   // Formateador de moneda ARS
   const formatCurrency = (amount) => {
@@ -234,10 +286,12 @@ export default function ProfilePage() {
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         item.status === 'ACTIVE'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-400'
+                          : item.status === 'UPCOMING'
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-slate-800 text-slate-400 border border-slate-700'
                       }`}
                     >
-                      {item.status === 'ACTIVE' ? 'Activa' : 'Finalizada'}
+                      {item.status === 'ACTIVE' ? 'Activa' : item.status === 'UPCOMING' ? 'Próximamente' : 'Finalizada'}
                     </span>
                   </div>
 
