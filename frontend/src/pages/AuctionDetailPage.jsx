@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Gavel, Loader2, Tag, User as UserIcon } from 'lucide-react';
 import { fetchWithAuth } from '../services/api';
 import { signalRService } from '../services/signalrService';
+import { MOCK_AUCTIONS } from '../services/mockData';
 import AuctionTimer from '../components/auctions/AuctionTimer';
 import BidConsole from '../components/auctions/BidConsole';
 
@@ -29,13 +30,45 @@ export default function AuctionDetailPage() {
 
   useEffect(() => {
     const loadAuction = async () => {
+      // Si el id es alfanumérico (ej: auc_101) o no numérico, buscar directamente en mocks
+      const isMockId = isNaN(Number(id));
+      if (isMockId) {
+        const mock = MOCK_AUCTIONS.find((a) => String(a.id) === String(id));
+        if (mock) {
+          setAuction({
+            ...mock,
+            state: mock.status === 'ACTIVE' ? 1 : mock.status === 'UPCOMING' ? 0 : 2,
+            category: mock.category,
+            bids: mock.bids || [],
+          });
+          setCurrentPrice(mock.currentPrice);
+          setBids(mock.bids || []);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       try {
         const data = await fetchWithAuth(`/auctions/${id}`);
         setAuction(data);
         setCurrentPrice(data.currentPrice);
         setBids(data.bids || []);
       } catch (err) {
-        setError(err.message || 'Error al cargar la subasta.');
+        // Fallback por si la API falla pero existe en mocks
+        const mock = MOCK_AUCTIONS.find((a) => String(a.id) === String(id));
+        if (mock) {
+          setAuction({
+            ...mock,
+            state: mock.status === 'ACTIVE' ? 1 : mock.status === 'UPCOMING' ? 0 : 2,
+            category: mock.category,
+            bids: mock.bids || [],
+          });
+          setCurrentPrice(mock.currentPrice);
+          setBids(mock.bids || []);
+          setError(null);
+        } else {
+          setError(err.message || 'Error al cargar la subasta.');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -109,9 +142,16 @@ export default function AuctionDetailPage() {
         
         {/* Columna Izquierda: Detalles */}
         <div className="lg:col-span-2 space-y-8">
-          <div className="aspect-video bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center overflow-hidden">
-             {/* Imagen Placeholder */}
-             <Gavel className="w-24 h-24 text-slate-800" />
+          <div className="aspect-video bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center overflow-hidden relative">
+            {auction.imageUrl ? (
+              <img
+                src={auction.imageUrl}
+                alt={auction.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Gavel className="w-24 h-24 text-slate-800" />
+            )}
           </div>
           
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
