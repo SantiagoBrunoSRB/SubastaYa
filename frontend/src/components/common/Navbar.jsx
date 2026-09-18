@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Gavel, PlusCircle, User, Wallet, Menu, X } from 'lucide-react';
+import { useWallet } from '../../contexts/WalletContext';
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { balance } = useWallet();
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(value || 0);
+  };
 
   const navLinks = [
     { path: '/', label: 'Catálogo', icon: Gavel },
@@ -54,11 +60,11 @@ export default function Navbar() {
           {/* Slot para Billetera (Desarrollador B) + Acciones */}
           <div className="hidden md:flex items-center gap-4">
             {/* Slot de integración para Billetera del Dev B */}
-            <div id="wallet-navbar-slot" className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 text-sm">
+            <div id="wallet-navbar-slot" className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 text-sm hover:bg-slate-700 transition-colors cursor-pointer">
               <Wallet className="w-4 h-4 text-amber-400" />
-              <Link to="/billetera" className="hover:text-amber-400 transition-colors">
-                <span className="text-xs text-slate-400 block font-sans">Saldo</span>
-                <span className="font-semibold text-white text-sm">$---.--</span>
+              <Link to="/billetera" className="flex flex-col items-end">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-sans font-semibold">Disponible</span>
+                <span className="font-bold text-white text-sm">{formatCurrency(balance?.availableAmount)}</span>
               </Link>
             </div>
           </div>
@@ -109,7 +115,7 @@ export default function Navbar() {
                 <Wallet className="w-5 h-5 text-amber-400" />
                 <span>Billetera</span>
               </div>
-              <span className="font-semibold text-white">$---.--</span>
+              <span className="font-semibold text-white">{formatCurrency(balance?.availableAmount)}</span>
             </Link>
           </div>
         </div>
