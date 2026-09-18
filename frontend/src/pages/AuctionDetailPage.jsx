@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Gavel, Loader2, Tag, User as UserIcon } from 'lucide-react';
-import { fetchWithAuth } from '../services/api';
+import { fetchWithAuth, adaptBackendAuction } from '../services/api';
 import { signalRService } from '../services/signalrService';
 import { MOCK_AUCTIONS } from '../services/mockData';
 import AuctionTimer from '../components/auctions/AuctionTimer';
@@ -37,9 +37,10 @@ export default function AuctionDetailPage() {
       if (isNumericId) {
         try {
           const data = await fetchWithAuth(`/auctions/${id}`);
-          setAuction(data);
-          setCurrentPrice(data.currentPrice);
-          setBids(data.bids || []);
+          const adapted = adaptBackendAuction(data);
+          setAuction(adapted);
+          setCurrentPrice(adapted.currentPrice);
+          setBids(adapted.bids || []);
           setError(null);
         } catch (err) {
           setError(err.message || 'Error al cargar la subasta.');

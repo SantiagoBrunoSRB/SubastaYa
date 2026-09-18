@@ -31,6 +31,7 @@ public class GetAuctionByIdUseCase
             StartTime = auction.StartTime,
             EndTime = auction.EndTime,
             State = auction.State,
+            ImageUrl = auction.ImageUrl,
             Bids = auction.Bids.Select(b => new BidDto
             {
                 Id = b.Id,

@@ -92,7 +92,8 @@ public static class DataSeeder
                     SellerId = sellerId,
                     StartTime = DateTime.UtcNow.AddMinutes(-30),
                     EndTime = DateTime.UtcNow.AddHours(2),
-                    State = AuctionState.Active
+                    State = AuctionState.Active,
+                    ImageUrl = "https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=800&q=80"
                 };
                 context.Auctions.Add(auction1);
             }
@@ -109,7 +110,8 @@ public static class DataSeeder
                     SellerId = sellerId,
                     StartTime = DateTime.UtcNow.AddMinutes(-10),
                     EndTime = DateTime.UtcNow.AddSeconds(45), // Activa crítica (< 60s)
-                    State = AuctionState.Active
+                    State = AuctionState.Active,
+                    ImageUrl = "https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=800&q=80"
                 });
             }
 
@@ -125,7 +127,8 @@ public static class DataSeeder
                     SellerId = sellerId,
                     StartTime = DateTime.UtcNow.AddHours(24),
                     EndTime = DateTime.UtcNow.AddHours(48), // Próxima
-                    State = AuctionState.Active
+                    State = AuctionState.Active,
+                    ImageUrl = "https://images.unsplash.com/photo-1577223625816-7546f13df25d?auto=format&fit=crop&w=800&q=80"
                 });
             }
 
@@ -141,7 +144,8 @@ public static class DataSeeder
                     SellerId = sellerId,
                     StartTime = DateTime.UtcNow.AddDays(-2),
                     EndTime = DateTime.UtcNow.AddDays(-1), // Vencida
-                    State = AuctionState.Closed
+                    State = AuctionState.Closed,
+                    ImageUrl = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80"
                 });
             }
 
@@ -157,7 +161,8 @@ public static class DataSeeder
                     SellerId = sellerId,
                     StartTime = DateTime.UtcNow.AddDays(-2),
                     EndTime = DateTime.UtcNow.AddDays(-1), // Vencida sin pujas
-                    State = AuctionState.Closed
+                    State = AuctionState.Closed,
+                    ImageUrl = "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80"
                 });
             }
 

@@ -27,6 +27,7 @@ public class CreateAuctionUseCase
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             SellerId = sellerId,
+            ImageUrl = request.ImageUrl,
             State = AuctionState.Active
         };
 

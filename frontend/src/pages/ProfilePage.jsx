@@ -15,8 +15,7 @@ import {
   LogIn,
 } from 'lucide-react';
 import { MOCK_USER, MOCK_AUCTIONS } from '../services/mockData';
-import { fetchWithAuth } from '../services/api';
-import { getEffectiveStatus } from './HomePage';
+import { fetchWithAuth, adaptBackendAuction, getEffectiveStatus } from '../services/api';
 import { useWallet } from '../contexts/WalletContext';
 
 export default function ProfilePage() {
@@ -37,7 +36,7 @@ export default function ProfilePage() {
         // Publicaciones: el endpoint filtra automáticamente por el usuario del JWT
         const data = await fetchWithAuth('/auctions/my-publications');
         const pubs = Array.isArray(data)
-          ? data.map((a) => ({ ...a, status: getEffectiveStatus(a) }))
+          ? data.map((a) => adaptBackendAuction(a)).map((a) => ({ ...a, status: getEffectiveStatus(a) }))
           : [];
         setMyPublications(pubs);
       } catch (err) {
@@ -225,8 +224,9 @@ export default function ProfilePage() {
                 className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex gap-4 items-center hover:border-slate-700 transition-colors"
               >
                 <img
-                  src={item.imageUrl}
+                  src={item.imageUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=200&q=60'}
                   alt={item.title}
+                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=200&q=60'; }}
                   className="w-20 h-20 rounded-xl object-cover bg-slate-950 shrink-0"
                 />
                 <div className="space-y-1 flex-grow min-w-0">
@@ -290,8 +290,9 @@ export default function ProfilePage() {
                 className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex gap-4 items-center hover:border-slate-700 transition-colors"
               >
                 <img
-                  src={item.imageUrl}
+                  src={item.imageUrl || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=200&q=60'}
                   alt={item.title}
+                  onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=200&q=60'; }}
                   className="w-20 h-20 rounded-xl object-cover bg-slate-950 shrink-0"
                 />
                 <div className="space-y-1 flex-grow min-w-0">
