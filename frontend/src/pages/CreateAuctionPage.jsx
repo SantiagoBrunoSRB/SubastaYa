@@ -111,6 +111,7 @@ export default function CreateAuctionPage() {
           startingPrice: parseFloat(formData.startingPrice),
           startTime: new Date(formData.startTime).toISOString(),
           endTime: new Date(formData.endTime).toISOString(),
+          imageUrl: formData.imageUrl.trim() || null,
         }),
       });
       setCreatedAuctionId(response.id);
@@ -389,7 +390,7 @@ export default function CreateAuctionPage() {
             <div className="pt-2 flex flex-col gap-2">
               {createdAuctionId && (
                 <button
-                  onClick={() => navigate(`/auctions/${createdAuctionId}`)}
+                  onClick={() => navigate(`/subasta/${createdAuctionId}`)}
                   className="w-full py-3 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer"
                 >
                   Ver mi Subasta
