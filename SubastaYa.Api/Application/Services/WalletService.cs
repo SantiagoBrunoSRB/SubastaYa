@@ -235,52 +235,40 @@ public class WalletService : IWalletService
         if (amount <= 0)
             throw new InvalidAmountException(amount, "El monto a liquidar debe ser mayor a cero.");
 
-        using var tx = await _walletRepository.BeginTransactionAsync(ct);
-        try
+        // 1. Comprador (ganador): se debita el saldo retenido y el total
+        var buyerWallet = await _walletRepository.GetByUserIdAsync(buyerId, ct)
+            ?? throw new WalletNotFoundException($"Billetera del comprador '{buyerId}' no encontrada.");
+
+        if (buyerWallet.RetainedBalance >= amount)
+            buyerWallet.RetainedBalance -= amount;
+        else
+            buyerWallet.RetainedBalance = 0;
+
+        buyerWallet.TotalBalance -= amount;
+        _walletRepository.Update(buyerWallet);
+
+        await _walletRepository.AddTransactionAsync(new TransactionLedger
         {
-            // 1. Comprador (ganador): se debita el saldo retenido y el total
-            var buyerWallet = await _walletRepository.GetByUserIdAsync(buyerId, ct)
-                ?? throw new WalletNotFoundException($"Billetera del comprador '{buyerId}' no encontrada.");
+            WalletId = buyerWallet.Id,
+            Type = TransactionType.Debit,
+            Amount = amount,
+            AuctionId = auctionId,
+            CreatedAt = DateTime.UtcNow
+        }, ct);
 
-            if (buyerWallet.RetainedBalance >= amount)
-                buyerWallet.RetainedBalance -= amount;
-            else
-                buyerWallet.RetainedBalance = 0;
+        // 2. Vendedor: se le acredita el dinero al saldo total
+        var sellerWallet = await GetOrCreateWalletAsync(sellerId, ct);
+        sellerWallet.TotalBalance += amount;
+        _walletRepository.Update(sellerWallet);
 
-            buyerWallet.TotalBalance -= amount;
-            _walletRepository.Update(buyerWallet);
-
-            await _walletRepository.AddTransactionAsync(new TransactionLedger
-            {
-                WalletId = buyerWallet.Id,
-                Type = TransactionType.Debit,
-                Amount = amount,
-                AuctionId = auctionId,
-                CreatedAt = DateTime.UtcNow
-            }, ct);
-
-            // 2. Vendedor: se le acredita el dinero al saldo total
-            var sellerWallet = await GetOrCreateWalletAsync(sellerId, ct);
-            sellerWallet.TotalBalance += amount;
-            _walletRepository.Update(sellerWallet);
-
-            await _walletRepository.AddTransactionAsync(new TransactionLedger
-            {
-                WalletId = sellerWallet.Id,
-                Type = TransactionType.Credit,
-                Amount = amount,
-                AuctionId = auctionId,
-                CreatedAt = DateTime.UtcNow
-            }, ct);
-
-            await _walletRepository.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-        }
-        catch
+        await _walletRepository.AddTransactionAsync(new TransactionLedger
         {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
+            WalletId = sellerWallet.Id,
+            Type = TransactionType.Credit,
+            Amount = amount,
+            AuctionId = auctionId,
+            CreatedAt = DateTime.UtcNow
+        }, ct);
     }
 
     /// <summary>
