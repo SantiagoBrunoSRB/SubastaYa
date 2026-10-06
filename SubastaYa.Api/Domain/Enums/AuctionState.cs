@@ -4,5 +4,6 @@ public enum AuctionState
 {
     Active = 1,
     Closed = 2,
-    Cancelled = 3
+    Cancelled = 3,
+    Abandoned = 4
 }
