@@ -68,6 +68,7 @@ public class AuctionClosingWorker : BackgroundService
 
         foreach (var auction in expiredAuctions)
         {
+            await using var tx = await context.Database.BeginTransactionAsync(ct);
             try
             {
                 var highestBid = auction.Bids
@@ -108,31 +109,12 @@ public class AuctionClosingWorker : BackgroundService
                         }),
                         Timestamp = now
                     });
-
-                    // Notificación en tiempo real vía SignalR
-                    await _hubContext.Clients.Group($"Auction_{auction.Id}").SendAsync("AuctionClosed", new
-                    {
-                        AuctionId = auction.Id,
-                        Title = auction.Title,
-                        WinnerId = highestBid.BidderId,
-                        FinalPrice = highestBid.Amount,
-                        State = "Closed"
-                    }, ct);
-
-                    await _hubContext.Clients.All.SendAsync("AuctionClosed", new
-                    {
-                        AuctionId = auction.Id,
-                        Title = auction.Title,
-                        WinnerId = highestBid.BidderId,
-                        FinalPrice = highestBid.Amount,
-                        State = "Closed"
-                    }, ct);
                 }
                 else
                 {
-                    // No hubo pujas: cerrar la subasta sin liquidación
-                    _logger.LogInformation("Cerrando subasta {AuctionId} ({Title}) sin pujas registradas.", auction.Id, auction.Title);
-                    auction.State = AuctionState.Closed;
+                    // No hubo pujas: cerrar la subasta sin liquidación como Desierta (Abandoned)
+                    _logger.LogInformation("Cerrando subasta {AuctionId} ({Title}) sin pujas registradas (Desierta).", auction.Id, auction.Title);
+                    auction.State = AuctionState.Abandoned;
 
                     context.AuditLogs.Add(new AuditLog
                     {
@@ -148,21 +130,43 @@ public class AuctionClosingWorker : BackgroundService
                         }),
                         Timestamp = now
                     });
-
-                    await _hubContext.Clients.Group($"Auction_{auction.Id}").SendAsync("AuctionClosed", new
-                    {
-                        AuctionId = auction.Id,
-                        Title = auction.Title,
-                        WinnerId = (string?)null,
-                        FinalPrice = auction.StartingPrice,
-                        State = "Closed"
-                    }, ct);
                 }
 
+                // Un solo SaveChanges y Commit dentro de la misma transacción
                 await context.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                // Notificación en tiempo real vía SignalR tras confirmar el commit
+                var stateStr = auction.State == AuctionState.Closed ? "Closed" : "Abandoned";
+                var winnerId = highestBid?.BidderId;
+                var finalPrice = highestBid != null ? highestBid.Amount : auction.StartingPrice;
+
+                await _hubContext.Clients.Group($"Auction_{auction.Id}").SendAsync("AuctionClosed", new
+                {
+                    AuctionId = auction.Id,
+                    Title = auction.Title,
+                    WinnerId = winnerId,
+                    FinalPrice = finalPrice,
+                    State = stateStr
+                }, ct);
+
+                await _hubContext.Clients.All.SendAsync("AuctionClosed", new
+                {
+                    AuctionId = auction.Id,
+                    Title = auction.Title,
+                    WinnerId = winnerId,
+                    FinalPrice = finalPrice,
+                    State = stateStr
+                }, ct);
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await tx.RollbackAsync(ct);
+                _logger.LogWarning(ex, "Subasta {AuctionId} fue modificada o cerrada por otro proceso concurrente. Se ignora para evitar duplicación.", auction.Id);
             }
             catch (Exception ex)
             {
+                await tx.RollbackAsync(ct);
                 _logger.LogError(ex, "Error al procesar el cierre de la subasta {AuctionId}", auction.Id);
             }
         }
