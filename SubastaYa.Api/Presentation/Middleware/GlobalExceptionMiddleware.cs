@@ -77,6 +77,14 @@ public class GlobalExceptionMiddleware
                 problemDetails.Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8";
                 break;
 
+            case ConcurrencyException ex:
+                context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+                problemDetails.Status = (int)HttpStatusCode.Conflict;
+                problemDetails.Title = "Conflicto de Concurrencia";
+                problemDetails.Detail = ex.Message;
+                problemDetails.Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8";
+                break;
+
             case DomainException ex:
                 context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
                 problemDetails.Status = (int)HttpStatusCode.BadRequest;
