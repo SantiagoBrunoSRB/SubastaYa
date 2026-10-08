@@ -158,7 +158,9 @@ public class WalletService : IWalletService
     }
 
     /// <summary>
-    /// Transacción atómica que libera el saldo del postor anterior y retiene el saldo del nuevo postor.
+    /// Libera el saldo del postor anterior y retiene el saldo del nuevo postor.
+    /// NOTA: No abre transacción propia ni llama SaveChanges. El llamador (PlaceBidUseCase) es responsable
+    /// de ambas cosas dentro de su transacción unificada.
     /// </summary>
     public async Task ReplaceHoldAsync(
         string? previousBidderId,
@@ -168,63 +170,53 @@ public class WalletService : IWalletService
         int auctionId,
         CancellationToken ct = default)
     {
-        using var tx = await _walletRepository.BeginTransactionAsync(ct);
-        try
+        // 1. Liberar fondos del postor anterior si aplica
+        if (!string.IsNullOrWhiteSpace(previousBidderId) && previousAmount.HasValue && previousAmount.Value > 0)
         {
-            // 1. Liberar fondos del postor anterior si aplica
-            if (!string.IsNullOrWhiteSpace(previousBidderId) && previousAmount.HasValue && previousAmount.Value > 0)
+            var prevWallet = await _walletRepository.GetByUserIdAsync(previousBidderId, ct);
+            if (prevWallet != null)
             {
-                var prevWallet = await _walletRepository.GetByUserIdAsync(previousBidderId, ct);
-                if (prevWallet != null)
+                if (prevWallet.RetainedBalance < previousAmount.Value)
+                    prevWallet.RetainedBalance = 0;
+                else
+                    prevWallet.RetainedBalance -= previousAmount.Value;
+
+                _walletRepository.Update(prevWallet);
+
+                await _walletRepository.AddTransactionAsync(new TransactionLedger
                 {
-                    if (prevWallet.RetainedBalance < previousAmount.Value)
-                        prevWallet.RetainedBalance = 0;
-                    else
-                        prevWallet.RetainedBalance -= previousAmount.Value;
-
-                    _walletRepository.Update(prevWallet);
-
-                    await _walletRepository.AddTransactionAsync(new TransactionLedger
-                    {
-                        WalletId = prevWallet.Id,
-                        Type = TransactionType.Release,
-                        Amount = previousAmount.Value,
-                        AuctionId = auctionId,
-                        CreatedAt = DateTime.UtcNow
-                    }, ct);
-                }
+                    WalletId = prevWallet.Id,
+                    Type = TransactionType.Release,
+                    Amount = previousAmount.Value,
+                    AuctionId = auctionId,
+                    CreatedAt = DateTime.UtcNow
+                }, ct);
             }
-
-            // 2. Retener fondos del nuevo postor
-            if (newAmount <= 0)
-                throw new InvalidAmountException(newAmount, "El monto de la puja debe ser mayor a cero.");
-
-            var newWallet = await _walletRepository.GetByUserIdAsync(newBidderId, ct)
-                ?? throw new WalletNotFoundException($"No se encontró la billetera del usuario postor '{newBidderId}'.");
-
-            if (newWallet.AvailableBalance < newAmount)
-                throw new InsufficientFundsException(newWallet.AvailableBalance, newAmount);
-
-            newWallet.RetainedBalance += newAmount;
-            _walletRepository.Update(newWallet);
-
-            await _walletRepository.AddTransactionAsync(new TransactionLedger
-            {
-                WalletId = newWallet.Id,
-                Type = TransactionType.Hold,
-                Amount = newAmount,
-                AuctionId = auctionId,
-                CreatedAt = DateTime.UtcNow
-            }, ct);
-
-            await _walletRepository.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
         }
-        catch
+
+        // 2. Retener fondos del nuevo postor
+        if (newAmount <= 0)
+            throw new InvalidAmountException(newAmount, "El monto de la puja debe ser mayor a cero.");
+
+        var newWallet = await _walletRepository.GetByUserIdAsync(newBidderId, ct)
+            ?? throw new WalletNotFoundException($"No se encontró la billetera del usuario postor '{newBidderId}'.");
+
+        if (newWallet.AvailableBalance < newAmount)
+            throw new InsufficientFundsException(newWallet.AvailableBalance, newAmount);
+
+        newWallet.RetainedBalance += newAmount;
+        _walletRepository.Update(newWallet);
+
+        await _walletRepository.AddTransactionAsync(new TransactionLedger
         {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
+            WalletId = newWallet.Id,
+            Type = TransactionType.Hold,
+            Amount = newAmount,
+            AuctionId = auctionId,
+            CreatedAt = DateTime.UtcNow
+        }, ct);
+
+        // ⚠️ Sin SaveChangesAsync() aquí — lo llama PlaceBidUseCase desde su TX unificada
     }
 
     /// <summary>
