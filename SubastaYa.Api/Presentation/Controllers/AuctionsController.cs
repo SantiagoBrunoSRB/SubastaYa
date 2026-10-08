@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using SubastaYa.Api.Application.CQRS;
 using SubastaYa.Api.Application.DTOs.Auctions;
 using SubastaYa.Api.Application.DTOs.Bids;
 using SubastaYa.Api.Application.UseCases.Auctions.CreateAuction;
@@ -17,31 +18,35 @@ namespace SubastaYa.Api.Presentation.Controllers;
 [Route("api/auctions")]
 public class AuctionsController : ControllerBase
 {
-    private readonly CreateAuctionUseCase _createAuctionUseCase;
-    private readonly GetAuctionsUseCase _getAuctionsUseCase;
-    private readonly GetAuctionByIdUseCase _getAuctionByIdUseCase;
-    private readonly PlaceBidUseCase _placeBidUseCase;
+    private readonly ICommandHandler<CreateAuctionCommand, int> _createAuctionHandler;
+    private readonly IQueryHandler<GetAuctionsQuery, IEnumerable<AuctionResponseDto>> _getAuctionsHandler;
+    private readonly IQueryHandler<GetAuctionByIdQuery, AuctionDetailResponseDto> _getAuctionByIdHandler;
+    private readonly ICommandHandler<PlaceBidCommand> _placeBidHandler;
     private readonly IHubContext<AuctionHub> _hubContext;
 
     public AuctionsController(
-        CreateAuctionUseCase createAuctionUseCase,
-        GetAuctionsUseCase getAuctionsUseCase,
-        GetAuctionByIdUseCase getAuctionByIdUseCase,
-        PlaceBidUseCase placeBidUseCase,
+        ICommandHandler<CreateAuctionCommand, int> createAuctionHandler,
+        IQueryHandler<GetAuctionsQuery, IEnumerable<AuctionResponseDto>> getAuctionsHandler,
+        IQueryHandler<GetAuctionByIdQuery, AuctionDetailResponseDto> getAuctionByIdHandler,
+        ICommandHandler<PlaceBidCommand> placeBidHandler,
         IHubContext<AuctionHub> hubContext)
     {
-        _createAuctionUseCase = createAuctionUseCase;
-        _getAuctionsUseCase = getAuctionsUseCase;
-        _getAuctionByIdUseCase = getAuctionByIdUseCase;
-        _placeBidUseCase = placeBidUseCase;
+        _createAuctionHandler = createAuctionHandler;
+        _getAuctionsHandler = getAuctionsHandler;
+        _getAuctionByIdHandler = getAuctionByIdHandler;
+        _placeBidHandler = placeBidHandler;
         _hubContext = hubContext;
     }
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAuctions([FromQuery] bool includeClosed = false, [FromQuery] string? sellerId = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetAuctions(
+        [FromQuery] bool includeClosed = false,
+        [FromQuery] string? sellerId = null,
+        CancellationToken cancellationToken = default)
     {
-        var auctions = await _getAuctionsUseCase.ExecuteAsync(includeClosed, sellerId, cancellationToken);
+        var query = new GetAuctionsQuery(includeClosed, sellerId);
+        var auctions = await _getAuctionsHandler.HandleAsync(query, cancellationToken);
         return Ok(auctions);
     }
 
@@ -51,7 +56,8 @@ public class AuctionsController : ControllerBase
         var sellerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(sellerId)) return Unauthorized();
 
-        var auctions = await _getAuctionsUseCase.ExecuteAsync(includeClosed: true, sellerId: sellerId, cancellationToken: cancellationToken);
+        var query = new GetAuctionsQuery(IncludeClosed: true, SellerId: sellerId);
+        var auctions = await _getAuctionsHandler.HandleAsync(query, cancellationToken);
         return Ok(auctions);
     }
 
@@ -61,28 +67,36 @@ public class AuctionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAuction(int id, CancellationToken cancellationToken)
     {
-        var auction = await _getAuctionByIdUseCase.ExecuteAsync(id, cancellationToken);
+        var query = new GetAuctionByIdQuery(id);
+        var auction = await _getAuctionByIdHandler.HandleAsync(query, cancellationToken);
         return Ok(auction);
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionRequestDto request, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateAuction(
+        [FromBody] CreateAuctionRequestDto request,
+        CancellationToken cancellationToken)
     {
         var sellerId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(sellerId)) return Unauthorized();
 
-        var id = await _createAuctionUseCase.ExecuteAsync(request, sellerId, cancellationToken);
-        
+        var command = new CreateAuctionCommand(request, sellerId);
+        var id = await _createAuctionHandler.HandleAsync(command, cancellationToken);
+
         return CreatedAtAction(nameof(GetAuctions), new { id }, new { id });
     }
 
     [HttpPost("{id}/bids")]
-    public async Task<IActionResult> PlaceBid(int id, [FromBody] PlaceBidRequestDto request, CancellationToken cancellationToken)
+    public async Task<IActionResult> PlaceBid(
+        int id,
+        [FromBody] PlaceBidRequestDto request,
+        CancellationToken cancellationToken)
     {
         var bidderId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(bidderId)) return Unauthorized();
 
-        await _placeBidUseCase.ExecuteAsync(id, bidderId, request, cancellationToken);
+        var command = new PlaceBidCommand(id, bidderId, request.Amount);
+        await _placeBidHandler.HandleAsync(command, cancellationToken);
 
         // Notificar a los suscriptores de la sala en tiempo real vía SignalR
         await _hubContext.Clients.Group($"Auction_{id}").SendAsync("ReceiveBid", new
@@ -92,7 +106,7 @@ public class AuctionsController : ControllerBase
             amount = request.Amount,
             timestamp = DateTime.UtcNow
         }, cancellationToken);
-        
+
         return Ok(new { success = true, amount = request.Amount });
     }
 }
