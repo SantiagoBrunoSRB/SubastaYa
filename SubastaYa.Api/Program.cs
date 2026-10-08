@@ -16,6 +16,8 @@ using SubastaYa.Api.Presentation.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using SubastaYa.Api.Application.CQRS;
+using SubastaYa.Api.Application.DTOs.Auctions;
 using SubastaYa.Api.Application.Interfaces.Services;
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,11 +70,11 @@ builder.Services.AddScoped<IAuctionRepository, AuctionRepository>();
 builder.Services.AddScoped<IBidRepository, BidRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
-// Casos de Uso Subastas
-builder.Services.AddScoped<CreateAuctionUseCase>();
-builder.Services.AddScoped<GetAuctionsUseCase>();
-builder.Services.AddScoped<GetAuctionByIdUseCase>();
-builder.Services.AddScoped<PlaceBidUseCase>();
+// Handlers CQRS - Subastas y Pujas
+builder.Services.AddScoped<ICommandHandler<CreateAuctionCommand, int>, CreateAuctionHandler>();
+builder.Services.AddScoped<IQueryHandler<GetAuctionsQuery, IEnumerable<AuctionResponseDto>>, GetAuctionsHandler>();
+builder.Services.AddScoped<IQueryHandler<GetAuctionByIdQuery, AuctionDetailResponseDto>, GetAuctionByIdHandler>();
+builder.Services.AddScoped<ICommandHandler<PlaceBidCommand>, PlaceBidHandler>();
 
 // 5. Background Services (Workers en segundo plano)
 builder.Services.AddHostedService<AuctionClosingWorker>();
