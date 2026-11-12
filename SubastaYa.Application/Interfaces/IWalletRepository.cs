@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore.Storage;
 using SubastaYa.Api.Domain.Entities;
 
 namespace SubastaYa.Api.Application.Interfaces;
@@ -37,14 +36,4 @@ public interface IWalletRepository
     /// Obtiene las transacciones de una billetera ordenadas por fecha descendente.
     /// </summary>
     Task<IEnumerable<TransactionLedger>> GetTransactionsByWalletIdAsync(int walletId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Guarda todos los cambios pendientes en la base de datos.
-    /// </summary>
-    Task SaveChangesAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Inicia una transacción explícita de base de datos para operaciones atómicas.
-    /// </summary>
-    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default);
 }

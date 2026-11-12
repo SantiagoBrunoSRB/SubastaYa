@@ -74,6 +74,8 @@ public static class DbSeeder
         {
             Title = "Laptop Gamer Pro RTX 4080 (Tecnología)",
             Description = "Laptop de alta gama con 32GB RAM y pantalla OLED 240Hz.",
+            Category = "Tecnología",
+            ImageUrl = "https://images.unsplash.com/photo-1603302576837-37561b2e2302?auto=format&fit=crop&w=800&q=80",
             StartingPrice = 30000m,
             CurrentPrice = 45000m,
             SellerId = sellerUser.Id,
@@ -86,6 +88,8 @@ public static class DbSeeder
         {
             Title = "Smartphone Flagship OLED (Tecnología)",
             Description = "Teléfono móvil con cámara de 200MP y carga ultrarrápida.",
+            Category = "Tecnología",
+            ImageUrl = "https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?auto=format&fit=crop&w=800&q=80",
             StartingPrice = 15000m,
             CurrentPrice = 15000m,
             SellerId = sellerUser.Id,
@@ -98,6 +102,8 @@ public static class DbSeeder
         {
             Title = "Colección de Cómics Raros #1 (Coleccionables)",
             Description = "Edición limitada de cómics retro conservada en estuche hermético.",
+            Category = "Coleccionables",
+            ImageUrl = "https://images.unsplash.com/photo-1577223625816-7546f13df25d?auto=format&fit=crop&w=800&q=80",
             StartingPrice = 50000m,
             CurrentPrice = 50000m,
             SellerId = sellerUser.Id,
@@ -110,6 +116,8 @@ public static class DbSeeder
         {
             Title = "Reloj Antiguo de Colección (Coleccionables)",
             Description = "Reloj de bolsillo suizo automático bañado en oro.",
+            Category = "Coleccionables",
+            ImageUrl = "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=80",
             StartingPrice = 20000m,
             CurrentPrice = 35000m,
             SellerId = sellerUser.Id,
@@ -122,6 +130,8 @@ public static class DbSeeder
         {
             Title = "Cuadro al Óleo Vintage (Arte)",
             Description = "Pintura al óleo sobre lienzo firmada de 1975.",
+            Category = "Arte",
+            ImageUrl = "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80",
             StartingPrice = 10000m,
             CurrentPrice = 10000m,
             SellerId = sellerUser.Id,

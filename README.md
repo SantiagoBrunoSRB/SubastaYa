@@ -34,44 +34,40 @@
 
 ## 2. Arquitectura del Sistema y Patrones
 
-El backend sigue los principios de **Clean Architecture / Domain-Driven Design (DDD)** con separación física en capas lógicas dentro de un único proyecto escalable:
+El backend sigue los principios de **Clean Architecture / Domain-Driven Design (DDD)** estructurado en **4 proyectos independientes** con estricta regla de dependencias:
 
 ```text
-SubastaYa.slnx
-├── SubastaYa.Api/                      # Proyecto Backend (.NET 8 Web API)
-│   ├── Domain/                         # Núcleo de Dominio (Sin dependencias externas)
-│   │   ├── Entities/                   # Auction, Wallet, Bid, TransactionLedger, AuditLog
-│   │   ├── Enums/                      # AuctionState, TransactionType
-│   │   └── Exceptions/                 # DomainException, InsufficientFundsException, etc.
-│   ├── Application/                    # Capa de Aplicación y Casos de Uso
-│   │   ├── DTOs/                       # Objetos de transferencia de datos
-│   │   ├── Interfaces/                 # Contratos de Servicios y Persistencia
-│   │   ├── Services/                   # WalletService (Escrow, Ledger), AuthService (JWT)
-│   │   └── UseCases/                   # CreateAuction, GetAuctions, GetAuctionById, PlaceBid
-│   ├── Infrastructure/                 # Capa de Infraestructura y Persistencia
-│   │   ├── BackgroundServices/         # AuctionClosingWorker (Cierre y Liquidación periódica)
-│   │   ├── Data/                       # AppDbContext, Migraciones Code-First, DbSeeder / DataSeeder
-│   │   └── Repositories/               # Repositorios concretos y UnitOfWork
-│   └── Presentation/                   # Capa de Presentación HTTP y WebSockets
-│       ├── Controllers/                # AuctionsController, WalletsController, AuthController
-│       ├── Hubs/                       # AuctionHub (SignalR WebSockets)
-│       └── Middleware/                 # GlobalExceptionMiddleware (RFC 7807 ProblemDetails)
-├── frontend/                           # Aplicación Web Frontend (React + Vite + Tailwind CSS)
-│   ├── src/
-│   │   ├── components/                 # Componentes UI modulares (AuctionCard, BidConsole, Timer, etc.)
-│   │   ├── contexts/                   # WalletContext (Estado global y Optimistic UI updates)
-│   │   ├── pages/                      # HomePage, AuctionDetailPage, CreateAuctionPage, ProfilePage, WalletPage
-│   │   └── services/                   # api.js (cliente HTTP con JWT) y signalrService.js (WebSockets)
-├── tests/                              # Suite de pruebas automatizadas en Python (Pytest + HTTPX)
-│   ├── test_section1_seed_data.py      # Verificación de saldos semilla, catálogo y ledger
-│   ├── test_section2_concurrency.py    # Test de estrés de concurrencia optimista y anti-sniping
-│   └── test_section3_scenarios.py      # Escenarios de negocio (fondos insuficientes, subastas próximas, escrow)
-└── reports/                            # Informes de ejecución de pruebas
+SubastaYa.sln
+├── SubastaYa.Domain/                      # Núcleo de Dominio (Sin dependencias externas)
+│   ├── Entities/                          # Auction, Wallet, Bid, TransactionLedger, AuditLog
+│   ├── Enums/                             # AuctionState, TransactionType
+│   └── Exceptions/                        # DomainException, ConcurrencyException, etc.
+├── SubastaYa.Application/                 # Capa de Aplicación, CQRS y Casos de Uso
+│   ├── CQRS/                              # ICommand, ICommandHandler, IQuery, IQueryHandler
+│   ├── DTOs/                              # Data Transfer Objects (Auctions, Bids, Wallets, Auth)
+│   ├── Interfaces/                        # Contratos de Servicios y Persistencia (IAuctionRepository, IUnitOfWork, etc.)
+│   ├── Services/                          # WalletService (Escrow, Ledger)
+│   └── UseCases/                          # Commands y Queries con Handlers (Auctions, Bids, Wallets)
+├── SubastaYa.Infrastructure/              # Capa de Persistencia y Acceso a Datos
+│   ├── Data/                              # AppDbContext, Migraciones Code-First, DbSeeder / DataSeeder
+│   ├── Repositories/                      # AuctionRepository, WalletRepository, BidRepository, UnitOfWork
+│   └── Services/                          # AuthService (JWT & Identity)
+├── SubastaYa.Api/                         # Capa de Presentación HTTP, WebSockets y Hosting
+│   ├── BackgroundServices/                # AuctionClosingWorker (Cierre y Liquidación periódica con UoW)
+│   ├── Presentation/
+│   │   ├── Controllers/                   # AuctionsController, WalletsController, AuthController (CQRS)
+│   │   ├── Hubs/                          # AuctionHub (SignalR WebSockets)
+│   │   └── Middleware/                    # GlobalExceptionMiddleware (RFC 7807 ProblemDetails)
+│   └── Program.cs                         # Configuración IoC, DI, JWT y Middleware
+├── frontend/                              # Aplicación Web Frontend (React + Vite + Tailwind CSS)
+└── tests/                                 # Suite de pruebas automatizadas en Python (Pytest + HTTPX)
 ```
 
 ### Patrones y Estándares Implementados:
+* **CQRS Custom (Command Query Responsibility Segregation):** Separación explícita entre operaciones de lectura (`IQuery` / `IQueryHandler`) y mutación (`ICommand` / `ICommandHandler`) en los controladores (`AuctionsController`, `WalletsController`).
+* **Repository & Unit of Work (UoW):** Repositorios desacoplados de la persistencia directa; `IUnitOfWork` coordina de manera centralizada la atomicidad y transacciones (`BeginTransactionAsync`, `SaveChangesAsync`, `CommitAsync`).
 * **Code-First & Migraciones:** Esquema de base de datos relacional generado mediante migraciones controladas de EF Core.
-* **Transacciones ACID:** Bloques transaccionales explícitos (`BeginTransactionAsync` / `CommitAsync` / `RollbackAsync`) para operaciones de custodia de fondos y liquidaciones finales.
+* **Transacciones ACID:** Bloques transaccionales explícitos mediante `IUnitOfWork` para operaciones de custodia de fondos (Escrow) y liquidaciones del Worker.
 * **Optimistic Locking:** Control de concurrencia con tokens de versión (`[Timestamp] byte[] Version`) en `Auction` y `Wallet` para evitar condiciones de carrera (*Race Conditions*).
 * **Manejo de Errores RFC 7807 (ProblemDetails):** Middleware interceptor que estandariza las respuestas de error ante conflictos de concurrencia (`409 Conflict`), errores de validación (`400 Bad Request`) o recursos inexistentes (`404 Not Found`).
 * **WebSockets Bidireccionales:** Sincronización en tiempo real vía SignalR con suscripción a grupos específicos (`Auction_{id}`).
@@ -331,11 +327,13 @@ PASSED [100%]
 | | Billetera: Total, Retenido y Disponible | ✅ | `WalletPage.jsx` y `WalletContext.jsx` con tres métricas financieras. |
 | | Panel de Usuario: Publicaciones | ✅ | `ProfilePage.jsx` conectado a `GET /api/auctions/my-publications`. |
 | **Dominio & Negocio** | Custodia de Fondos (Escrow) | ✅ | `WalletService.ReplaceHoldAsync` con bloqueo y liberación atómica. |
-| | Regla Anti-Sniping (< 60s -> +2 min) | ✅ | `PlaceBidUseCase.cs` (+2 min automáticos y registro en `AuditLogs`). |
-| | Liquidación Background Worker | ✅ | `AuctionClosingWorker.cs` cada 10s liquidando saldo del ganador al vendedor. |
+| | Regla Anti-Sniping (< 60s -> +2 min) | ✅ | `PlaceBidHandler.cs` (+2 min automáticos y registro en `AuditLogs`). |
+| | Liquidación Background Worker | ✅ | `AuctionClosingWorker.cs` cada 10s liquidando saldo del ganador al vendedor mediante `IUnitOfWork`. |
 | | Libro Mayor Contable (Ledger) | ✅ | `TransactionLedger` auditando `Deposit`, `Hold`, `Release`, `Debit` y `Credit`. |
 | | Registro de Auditoría (Audit Log) | ✅ | Tabla `AuditLogs` inmutable para eventos críticos del sistema. |
-| **Arquitectura & BD** | Code-First con Migraciones | ✅ | Entity Framework Core 8 con snapshot y migraciones en MySQL. |
+| **Arquitectura & BD** | Patrón CQRS Custom | ✅ | Commands y Queries independientes con Handlers tipados (`AuctionsController`, `WalletsController`). |
+| | Patrón Repository & Unit of Work | ✅ | Repositorios (`IAuctionRepository`, `IWalletRepository`, `IBidRepository`, `IAuditLogRepository`) y `IUnitOfWork` para persistencia y transacciones. |
+| | Code-First con Migraciones | ✅ | Entity Framework Core 8 con snapshot y migraciones en MySQL. |
 | | Optimistic Locking | ✅ | Columna `Version` `[Timestamp]` en `Auction` y `Wallet`. |
 | | Manejo de Concurrencia (409 Conflict) | ✅ | `GlobalExceptionMiddleware` con estándar RFC 7807 ProblemDetails. |
 | | WebSockets / Tiempo Real | ✅ | ASP.NET Core SignalR (`AuctionHub`) integrado con frontend. |

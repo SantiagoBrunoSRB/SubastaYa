@@ -1,5 +1,6 @@
 using SubastaYa.Api.Application.DTOs;
 using SubastaYa.Api.Application.Interfaces;
+using SubastaYa.Api.Application.Interfaces.Persistence;
 using SubastaYa.Api.Domain.Entities;
 using SubastaYa.Api.Domain.Enums;
 using SubastaYa.Api.Domain.Exceptions;
@@ -12,10 +13,12 @@ namespace SubastaYa.Api.Application.Services;
 public class WalletService : IWalletService
 {
     private readonly IWalletRepository _walletRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public WalletService(IWalletRepository walletRepository)
+    public WalletService(IWalletRepository walletRepository, IUnitOfWork unitOfWork)
     {
         _walletRepository = walletRepository;
+        _unitOfWork = unitOfWork;
     }
 
     /// <summary>
@@ -36,7 +39,7 @@ public class WalletService : IWalletService
                 RetainedBalance = 0
             };
             await _walletRepository.AddAsync(wallet, ct);
-            await _walletRepository.SaveChangesAsync(ct);
+            await _unitOfWork.SaveChangesAsync(ct);
         }
 
         return wallet;
@@ -88,7 +91,7 @@ public class WalletService : IWalletService
             CreatedAt = DateTime.UtcNow
         };
         await _walletRepository.AddTransactionAsync(ledger, ct);
-        await _walletRepository.SaveChangesAsync(ct);
+        await _unitOfWork.SaveChangesAsync(ct);
 
         return new WalletBalanceResponseDto(
             wallet.UserId,
@@ -124,7 +127,7 @@ public class WalletService : IWalletService
             CreatedAt = DateTime.UtcNow
         };
         await _walletRepository.AddTransactionAsync(ledger, ct);
-        await _walletRepository.SaveChangesAsync(ct);
+        await _unitOfWork.SaveChangesAsync(ct);
     }
 
     /// <summary>
@@ -154,12 +157,12 @@ public class WalletService : IWalletService
             CreatedAt = DateTime.UtcNow
         };
         await _walletRepository.AddTransactionAsync(ledger, ct);
-        await _walletRepository.SaveChangesAsync(ct);
+        await _unitOfWork.SaveChangesAsync(ct);
     }
 
     /// <summary>
     /// Libera el saldo del postor anterior y retiene el saldo del nuevo postor.
-    /// NOTA: No abre transacción propia ni llama SaveChanges. El llamador (PlaceBidUseCase) es responsable
+    /// NOTA: No abre transacción propia ni llama SaveChanges. El llamador (PlaceBidHandler) es responsable
     /// de ambas cosas dentro de su transacción unificada.
     /// </summary>
     public async Task ReplaceHoldAsync(

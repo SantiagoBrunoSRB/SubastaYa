@@ -18,8 +18,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using SubastaYa.Api.Application.CQRS;
+using SubastaYa.Api.Application.DTOs;
 using SubastaYa.Api.Application.DTOs.Auctions;
 using SubastaYa.Api.Application.Interfaces.Services;
+using SubastaYa.Api.Application.UseCases.Wallets.Deposit;
+using SubastaYa.Api.Application.UseCases.Wallets.GetBalance;
+using SubastaYa.Api.Application.UseCases.Wallets.GetTransactions;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuracion de la Base de Datos MySQL
@@ -76,6 +80,11 @@ builder.Services.AddScoped<ICommandHandler<CreateAuctionCommand, int>, CreateAuc
 builder.Services.AddScoped<IQueryHandler<GetAuctionsQuery, IEnumerable<AuctionResponseDto>>, GetAuctionsHandler>();
 builder.Services.AddScoped<IQueryHandler<GetAuctionByIdQuery, AuctionDetailResponseDto>, GetAuctionByIdHandler>();
 builder.Services.AddScoped<ICommandHandler<PlaceBidCommand>, PlaceBidHandler>();
+
+// Handlers CQRS - Billeteras
+builder.Services.AddScoped<ICommandHandler<DepositCommand, WalletBalanceResponseDto>, DepositHandler>();
+builder.Services.AddScoped<IQueryHandler<GetBalanceQuery, WalletBalanceResponseDto>, GetBalanceHandler>();
+builder.Services.AddScoped<IQueryHandler<GetTransactionsQuery, IEnumerable<TransactionResponseDto>>, GetTransactionsHandler>();
 
 // 5. Background Services (Workers en segundo plano)
 builder.Services.AddHostedService<AuctionClosingWorker>();
@@ -148,8 +157,6 @@ var app = builder.Build();
 // Interceptor global de excepciones (ProblemDetails RFC 7807)
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
-// Configuracion del pipeline HTTP
-app.UseMiddleware<ExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

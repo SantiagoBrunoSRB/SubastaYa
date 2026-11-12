@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using SubastaYa.Api.Application.Interfaces;
 using SubastaYa.Api.Domain.Entities;
 using SubastaYa.Api.Infrastructure.Data;
@@ -48,15 +47,5 @@ public class WalletRepository : IWalletRepository
             .Where(t => t.WalletId == walletId)
             .OrderByDescending(t => t.CreatedAt)
             .ToListAsync(ct);
-    }
-
-    public async Task SaveChangesAsync(CancellationToken ct = default)
-    {
-        await _context.SaveChangesAsync(ct);
-    }
-
-    public async Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken ct = default)
-    {
-        return await _context.Database.BeginTransactionAsync(ct);
     }
 }

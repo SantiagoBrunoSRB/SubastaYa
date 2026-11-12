@@ -2,9 +2,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using SubastaYa.Api.Application.Interfaces;
+using SubastaYa.Api.Application.Interfaces.Persistence;
 using SubastaYa.Api.Domain.Entities;
 using SubastaYa.Api.Domain.Enums;
-using SubastaYa.Api.Infrastructure.Data;
 using SubastaYa.Api.Presentation.Hubs;
 
 namespace SubastaYa.Api.BackgroundServices;
@@ -50,16 +50,15 @@ public class AuctionClosingWorker : BackgroundService
     private async Task ProcessExpiredAuctionsAsync(CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var auctionRepository = scope.ServiceProvider.GetRequiredService<IAuctionRepository>();
+        var auditLogRepository = scope.ServiceProvider.GetRequiredService<IAuditLogRepository>();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var walletService = scope.ServiceProvider.GetRequiredService<IWalletService>();
 
         var now = DateTime.UtcNow;
 
-        // Buscar subastas activas cuya fecha de finalización ya expiró
-        var expiredAuctions = await context.Auctions
-            .Include(a => a.Bids)
-            .Where(a => a.State == AuctionState.Active && a.EndTime <= now)
-            .ToListAsync(ct);
+        // Buscar subastas activas cuya fecha de finalización ya expiró mediante el repositorio
+        var expiredAuctions = (await auctionRepository.GetExpiredActiveAuctionsAsync(now, ct)).ToList();
 
         if (!expiredAuctions.Any())
             return;
@@ -68,7 +67,7 @@ public class AuctionClosingWorker : BackgroundService
 
         foreach (var auction in expiredAuctions)
         {
-            await using var tx = await context.Database.BeginTransactionAsync(ct);
+            await using var tx = await unitOfWork.BeginTransactionAsync(ct);
             try
             {
                 var highestBid = auction.Bids
@@ -94,7 +93,7 @@ public class AuctionClosingWorker : BackgroundService
                     auction.CurrentPrice = highestBid.Amount;
 
                     // Registro de auditoría
-                    context.AuditLogs.Add(new AuditLog
+                    await auditLogRepository.AddAsync(new AuditLog
                     {
                         Action = "AuctionClosed_WithWinner",
                         UserId = highestBid.BidderId,
@@ -108,7 +107,9 @@ public class AuctionClosingWorker : BackgroundService
                             ClosedAt = now
                         }),
                         Timestamp = now
-                    });
+                    }, ct);
+
+                    await auctionRepository.UpdateAsync(auction, ct);
                 }
                 else
                 {
@@ -116,7 +117,7 @@ public class AuctionClosingWorker : BackgroundService
                     _logger.LogInformation("Cerrando subasta {AuctionId} ({Title}) sin pujas registradas (Desierta).", auction.Id, auction.Title);
                     auction.State = AuctionState.Abandoned;
 
-                    context.AuditLogs.Add(new AuditLog
+                    await auditLogRepository.AddAsync(new AuditLog
                     {
                         Action = "AuctionClosed_NoBids",
                         UserId = auction.SellerId,
@@ -129,11 +130,13 @@ public class AuctionClosingWorker : BackgroundService
                             ClosedAt = now
                         }),
                         Timestamp = now
-                    });
+                    }, ct);
+
+                    await auctionRepository.UpdateAsync(auction, ct);
                 }
 
-                // Un solo SaveChanges y Commit dentro de la misma transacción
-                await context.SaveChangesAsync(ct);
+                // Un solo SaveChanges y Commit dentro de la misma transacción coordinado por IUnitOfWork
+                await unitOfWork.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
 
                 // Notificación en tiempo real vía SignalR tras confirmar el commit

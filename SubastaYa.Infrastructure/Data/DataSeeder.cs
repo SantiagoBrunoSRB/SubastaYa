@@ -116,13 +116,13 @@ public static class DataSeeder
                 });
             }
 
-            if (!await context.Auctions.AnyAsync(a => a.Title.Contains("Messi")))
+            if (!await context.Auctions.AnyAsync(a => a.Title.Contains("Cómics") || a.Title.Contains("Messi")))
             {
                 context.Auctions.Add(new Auction
                 {
-                    Title = "Camiseta Messi Firmada",
-                    Description = "Edición mundial Qatar.",
-                    Category = "Indumentaria",
+                    Title = "Colección de Cómics Raros #1 (Coleccionables)",
+                    Description = "Edición limitada de cómics retro conservada en estuche hermético.",
+                    Category = "Coleccionables",
                     StartingPrice = 50000m,
                     CurrentPrice = 50000m,
                     SellerId = sellerId,
@@ -133,36 +133,36 @@ public static class DataSeeder
                 });
             }
 
-            if (!await context.Auctions.AnyAsync(a => a.Title.Contains("Fiesta")))
+            if (!await context.Auctions.AnyAsync(a => a.Title.Contains("Reloj") || a.Title.Contains("Fiesta")))
             {
                 context.Auctions.Add(new Auction
                 {
-                    Title = "Auto Ford Fiesta",
-                    Description = "Buen estado.",
-                    Category = "Vehículos",
-                    StartingPrice = 200000m,
-                    CurrentPrice = 250000m,
+                    Title = "Reloj Antiguo de Colección (Coleccionables)",
+                    Description = "Reloj de bolsillo suizo automático bañado en oro.",
+                    Category = "Coleccionables",
+                    StartingPrice = 20000m,
+                    CurrentPrice = 35000m,
                     SellerId = sellerId,
-                    StartTime = DateTime.UtcNow.AddDays(-2),
-                    EndTime = DateTime.UtcNow.AddDays(-1), // Vencida
-                    State = AuctionState.Closed,
-                    ImageUrl = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80"
+                    StartTime = DateTime.UtcNow.AddHours(-5),
+                    EndTime = DateTime.UtcNow.AddMinutes(-10), // Vencida con ganador
+                    State = AuctionState.Active,
+                    ImageUrl = "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=800&q=80"
                 });
             }
 
-            if (!await context.Auctions.AnyAsync(a => a.Title.Contains("Cuadro")))
+            if (!await context.Auctions.AnyAsync(a => a.Title.Contains("Cuadro") || a.Title.Contains("Óleo")))
             {
                 context.Auctions.Add(new Auction
                 {
-                    Title = "Cuadro Abstracto",
-                    Description = "Pintura al óleo.",
+                    Title = "Cuadro al Óleo Vintage (Arte)",
+                    Description = "Pintura al óleo sobre lienzo firmada de 1975.",
                     Category = "Arte",
-                    StartingPrice = 5000m,
-                    CurrentPrice = 5000m,
+                    StartingPrice = 10000m,
+                    CurrentPrice = 10000m,
                     SellerId = sellerId,
-                    StartTime = DateTime.UtcNow.AddDays(-2),
-                    EndTime = DateTime.UtcNow.AddDays(-1), // Vencida sin pujas
-                    State = AuctionState.Closed,
+                    StartTime = DateTime.UtcNow.AddHours(-5),
+                    EndTime = DateTime.UtcNow.AddMinutes(-5), // Vencida desierta
+                    State = AuctionState.Active,
                     ImageUrl = "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=800&q=80"
                 });
             }
@@ -170,7 +170,7 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
 
-        // 4. Resetear y garantizar fechas y estados activos de subastas 1 y 2 en cada re-siembra
+        // 4. Resetear y garantizar fechas y estados de subastas en cada re-siembra
         var auctionsToReset = await context.Auctions.ToListAsync();
         foreach (var a in auctionsToReset)
         {
@@ -187,6 +187,13 @@ public static class DataSeeder
                 a.StartTime = DateTime.UtcNow.AddMinutes(-10);
                 a.EndTime = DateTime.UtcNow.AddSeconds(45); // < 60s (Anti-sniping zone)
                 a.CurrentPrice = 15000m;
+            }
+            else if (a.Id == 3 || a.Title.Contains("Cómics") || a.Title.Contains("Messi"))
+            {
+                a.State = AuctionState.Active;
+                a.StartTime = DateTime.UtcNow.AddHours(24);
+                a.EndTime = DateTime.UtcNow.AddHours(48);
+                a.CurrentPrice = 50000m;
             }
         }
         await context.SaveChangesAsync();
@@ -218,6 +225,23 @@ public static class DataSeeder
                     Amount = 45000m,
                     AuctionId = auction1Obj.Id,
                     CreatedAt = DateTime.UtcNow.AddMinutes(-2)
+                });
+                await context.SaveChangesAsync();
+            }
+        }
+
+        // 6. Asegurar puja inicial de $35.000 para la subasta 4 si fue creada
+        var auction4Obj = await context.Auctions.FirstOrDefaultAsync(a => a.Id == 4 || a.Title.Contains("Reloj"));
+        if (auction4Obj != null && userIds.TryGetValue("comprador1@test.com", out var comp1Id4))
+        {
+            if (!await context.Bids.AnyAsync(b => b.AuctionId == auction4Obj.Id))
+            {
+                context.Bids.Add(new Bid
+                {
+                    AuctionId = auction4Obj.Id,
+                    BidderId = comp1Id4,
+                    Amount = 35000m,
+                    Timestamp = DateTime.UtcNow.AddMinutes(-15)
                 });
                 await context.SaveChangesAsync();
             }

@@ -57,4 +57,12 @@ public class AuctionRepository : IAuctionRepository
         _context.Auctions.Update(auction);
         return Task.CompletedTask;
     }
+
+    public async Task<IEnumerable<Auction>> GetExpiredActiveAuctionsAsync(DateTime now, CancellationToken cancellationToken = default)
+    {
+        return await _context.Auctions
+            .Include(a => a.Bids)
+            .Where(a => a.State == Domain.Enums.AuctionState.Active && a.EndTime <= now)
+            .ToListAsync(cancellationToken);
+    }
 }

@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SubastaYa.Api.Application.CQRS;
 using SubastaYa.Api.Application.DTOs;
-using SubastaYa.Api.Application.Interfaces;
+using SubastaYa.Api.Application.UseCases.Wallets.Deposit;
+using SubastaYa.Api.Application.UseCases.Wallets.GetBalance;
+using SubastaYa.Api.Application.UseCases.Wallets.GetTransactions;
 using System.Security.Claims;
 
 namespace SubastaYa.Api.Presentation.Controllers;
@@ -11,11 +14,18 @@ namespace SubastaYa.Api.Presentation.Controllers;
 [Route("api/[controller]")]
 public class WalletsController : ControllerBase
 {
-    private readonly IWalletService _walletService;
+    private readonly IQueryHandler<GetBalanceQuery, WalletBalanceResponseDto> _getBalanceHandler;
+    private readonly ICommandHandler<DepositCommand, WalletBalanceResponseDto> _depositHandler;
+    private readonly IQueryHandler<GetTransactionsQuery, IEnumerable<TransactionResponseDto>> _getTransactionsHandler;
 
-    public WalletsController(IWalletService walletService)
+    public WalletsController(
+        IQueryHandler<GetBalanceQuery, WalletBalanceResponseDto> getBalanceHandler,
+        ICommandHandler<DepositCommand, WalletBalanceResponseDto> depositHandler,
+        IQueryHandler<GetTransactionsQuery, IEnumerable<TransactionResponseDto>> getTransactionsHandler)
     {
-        _walletService = walletService;
+        _getBalanceHandler = getBalanceHandler;
+        _depositHandler = depositHandler;
+        _getTransactionsHandler = getTransactionsHandler;
     }
 
     /// <summary>
@@ -31,7 +41,8 @@ public class WalletsController : ControllerBase
         if (string.IsNullOrWhiteSpace(userId))
             return Unauthorized(new { message = "Usuario no autenticado." });
 
-        var balance = await _walletService.GetBalanceAsync(userId, ct);
+        var query = new GetBalanceQuery(userId);
+        var balance = await _getBalanceHandler.HandleAsync(query, ct);
         return Ok(balance);
     }
 
@@ -53,7 +64,8 @@ public class WalletsController : ControllerBase
         if (request == null)
             return BadRequest(new { message = "El cuerpo de la solicitud no puede estar vacío." });
 
-        var result = await _walletService.DepositAsync(userId, request.Amount, ct);
+        var command = new DepositCommand(userId, request.Amount);
+        var result = await _depositHandler.HandleAsync(command, ct);
         return Ok(result);
     }
 
@@ -70,7 +82,8 @@ public class WalletsController : ControllerBase
         if (string.IsNullOrWhiteSpace(userId))
             return Unauthorized(new { message = "Usuario no autenticado." });
 
-        var transactions = await _walletService.GetTransactionsAsync(userId, ct);
+        var query = new GetTransactionsQuery(userId);
+        var transactions = await _getTransactionsHandler.HandleAsync(query, ct);
         return Ok(transactions);
     }
 
