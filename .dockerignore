@@ -1,0 +1,9 @@
+.git
+.vs
+**/bin
+**/obj
+frontend
+reports
+Correciones
+tests
+
